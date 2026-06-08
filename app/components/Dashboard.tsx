@@ -266,7 +266,7 @@ const Dashboard = () => {
       </div>
 
       {/* Funny Office Quote */}
-      <div className="glass rounded-xl p-5 border-l-4 border-emerald-500 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/50 dark:bg-transparent shadow-sm dark:shadow-none">
+      {/* <div className="glass rounded-xl p-5 border-l-4 border-emerald-500 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/50 dark:bg-transparent shadow-sm dark:shadow-none">
         <div className="flex items-center gap-3">
           <span className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
             <MessageSquareCode className="w-5 h-5" />
@@ -281,7 +281,7 @@ const Dashboard = () => {
         <div className="text-right">
           <span className="text-[10px] text-gray-500 dark:text-gray-400">Aprobado por el sindicato no-oficial</span>
         </div>
-      </div>
+      </div> */}
     </div>
   );
 };
