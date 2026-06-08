@@ -54,9 +54,10 @@ export default async function handler(
         
         // Errores comunes de Resend
         let userMessage = "Error al enviar el correo";
-        if (error.name === "restricted_api_key") {
+        const errorName = String(error.name);
+        if (errorName === "restricted_api_key") {
           userMessage = "La API key de Resend no tiene permisos para enviar a este destinatario. Usa una API key de producción o verifica tu dominio.";
-        } else if (error.name === "domain_not_verified") {
+        } else if (errorName === "domain_not_verified") {
           userMessage = "El dominio pronosticosleague.website no está verificado en Resend. Agrega los registros DNS requeridos en tu proveedor de dominio.";
         } else if (error.message?.includes("sandbox")) {
           userMessage = "Estás usando el modo sandbox de Resend. Solo puedes enviar correos a tu propia dirección verificada.";
