@@ -7,7 +7,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 
 // 📧 Correos autorizados para ver la Consola Admin
 const ADMIN_EMAILS = [
@@ -22,7 +22,13 @@ const Layout = ({
   getTeamById,
   children,
 }: any) => {
-  // Verificar si el usuario autenticado es admin
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Verificar si el usuario autenticado es admin (solo se usa después de montado)
   const isAdmin = myRegistration?.email && ADMIN_EMAILS.includes(myRegistration.email.toLowerCase());
 
   // Pre-compute user pill content to avoid hydration mismatches
@@ -136,7 +142,8 @@ const Layout = ({
             >
               <Users className="w-4 h-4" /> Representantes
             </button>
-            {isAdmin && (
+
+            {mounted && isAdmin && (
               <button
                 onClick={() => setActiveTab("admin")}
                 className={`px-3 py-2 rounded-t-lg text-sm font-semibold flex items-center gap-2 transition ${
@@ -154,7 +161,7 @@ const Layout = ({
           <div className="flex items-center gap-3">
             <ThemeToggle />
             <div className="h-8 w-px bg-gray-200 dark:bg-gray-800 hidden sm:block" />
-            {userPillContent}
+            {mounted && userPillContent}
           </div>
         </div>
 
@@ -193,7 +200,7 @@ const Layout = ({
             <Users className="w-4 h-4" />
             <span>Representantes</span>
           </button>
-          {isAdmin && (
+          {mounted && isAdmin && (
             <button
               onClick={() => setActiveTab("admin")}
               className={`flex flex-col items-center gap-1 ${
