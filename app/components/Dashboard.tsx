@@ -190,7 +190,61 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Bracket / Partidos */}
+      {/* FASE DE GRUPOS — Partidos */}
+      <div className="space-y-6">
+        <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-4">
+          <h3 className="text-xl font-bold tracking-tight flex items-center gap-2 text-gray-900 dark:text-white">
+            <CalendarDays className="text-emerald-500 dark:text-emerald-400" /> Fase de Grupos — Partidos del Mundial
+          </h3>
+          <span className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-3 py-1 rounded-full font-semibold border border-gray-200 dark:border-transparent">
+            {matches.filter(m => m.stage === 'Grupos').length} Partidos
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'].map(group => {
+            const groupMatches = matches.filter(m => m.stage === 'Grupos' && m.group === group);
+            return (
+              <div key={group} className="glass rounded-xl p-3 border border-gray-200 dark:border-gray-800/80 bg-white/50 dark:bg-transparent">
+                <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-2 mb-2">
+                  <span className="font-extrabold text-xs text-emerald-600 dark:text-emerald-400">{GROUP_LABELS[group]}</span>
+                  <span className="text-[9px] bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded-full font-semibold">
+                    {groupMatches.filter(m => m.scoreA !== null && m.scoreB !== null).length}/6
+                  </span>
+                </div>
+                <div className="space-y-1.5 max-h-[360px] overflow-y-auto pr-0.5">
+                  {groupMatches.map(m => (
+                    <div key={m.id} className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-2 border border-gray-100 dark:border-gray-800/50">
+                      <div className="flex justify-between items-center text-[9px] text-gray-400 dark:text-gray-500 mb-1">
+                        <span>{m.date}</span>
+                        <span className="truncate max-w-[80px]">{m.venue.split(',')[1] || m.venue}</span>
+                      </div>
+                      {/* Local */}
+                      <div className={`flex items-center justify-between text-[10px] py-0.5 px-1 rounded ${m.scoreA !== null && m.scoreB !== null && m.scoreA > m.scoreB ? 'bg-emerald-50 dark:bg-emerald-950/30 font-bold text-emerald-700 dark:text-emerald-300' : 'text-gray-600 dark:text-gray-300'}`}>
+                        <span className="flex items-center gap-1">
+                          <img src={getTeam(m.teamAId)?.flagUrl} alt="" className="w-3.5 h-2.5 object-cover rounded" loading="lazy" />
+                          <span>{getTeam(m.teamAId)?.name}</span>
+                        </span>
+                        <span className="font-extrabold text-xs">{m.scoreA !== null ? m.scoreA : '-'}</span>
+                      </div>
+                      {/* Visitante */}
+                      <div className={`flex items-center justify-between text-[10px] py-0.5 px-1 rounded ${m.scoreA !== null && m.scoreB !== null && m.scoreB > m.scoreA ? 'bg-emerald-50 dark:bg-emerald-950/30 font-bold text-emerald-700 dark:text-emerald-300' : 'text-gray-600 dark:text-gray-300'}`}>
+                        <span className="flex items-center gap-1">
+                          <img src={getTeam(m.teamBId)?.flagUrl} alt="" className="w-3.5 h-2.5 object-cover rounded" loading="lazy" />
+                          <span>{getTeam(m.teamBId)?.name}</span>
+                        </span>
+                        <span className="font-extrabold text-xs">{m.scoreB !== null ? m.scoreB : '-'}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* FASE ELIMINATORIA — Dieciseisavos, Octavos, Cuartos, Semis, Final */}
       <div className="space-y-6">
         <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-4">
           <h3 className="text-xl font-bold tracking-tight flex items-center gap-2 text-gray-900 dark:text-white">
