@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "La Quiniela Godín 2026",
-  description: "Quiniela Mundialista de la Oficina 2026",
+  title: "La Quiniela 2026",
+  description: "Quiniela Mundialista 2026",
 };
 
 export default function RootLayout({

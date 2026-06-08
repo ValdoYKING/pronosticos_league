@@ -66,10 +66,10 @@ const Representantes = () => {
 
             {/* Content Card: Lista de Representantes */}
             <div className="space-y-2 mt-4">
-              <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Representantes de la Oficina:</p>
+              <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Representantes:</p>
               <div className="flex flex-wrap gap-2 overflow-y-auto max-h-[64px] pr-1">
                 {getRepresentativesOf(t.id).length === 0 ? (
-                  <p className="text-xs text-gray-400 dark:text-gray-500 italic">Sin representante godín aún...</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 italic">Sin representante aún...</p>
                 ) : (
                   getRepresentativesOf(t.id).map(p => (
                     <div key={p.id} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs ${

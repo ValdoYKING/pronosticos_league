@@ -96,10 +96,10 @@ const Layout = ({
             </div>
             <div>
               <h1 className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-emerald-600 via-teal-500 to-amber-500 dark:from-emerald-400 dark:via-teal-300 dark:to-amber-400 bg-clip-text text-transparent">
-                La Quiniela Godín 2026
+                La Quiniela 2026
               </h1>
               <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium tracking-widest uppercase">
-                Mundial Office Edition
+                Mundial Edition
               </p>
             </div>
           </div>
@@ -218,7 +218,7 @@ const Layout = ({
       <footer className="mt-auto border-t border-gray-200 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-950/60 py-6 text-center text-xs text-gray-500 dark:text-gray-500">
         <div className="max-w-7xl mx-auto px-4 space-y-2">
           <p>
-            La Quiniela Godín 2026. Diseñada exclusivamente con fines
+            La Quiniela 2026. Diseñada exclusivamente con fines
             recreativos de integración corporativa.
           </p>
           <p className="text-[10px] text-gray-400 dark:text-gray-600">

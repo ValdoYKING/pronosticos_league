@@ -272,7 +272,7 @@ const Register = () => {
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400">
               Llena tus datos, selecciona la selección que vas a representar y
-              ¡que gane el mejor godín!
+              ¡que gane el mejor!
             </p>
           </div>
 
@@ -447,7 +447,7 @@ const Register = () => {
                 Selecciona tu Equipo Mundialista
               </h3>
               <p className="text-[11px] text-gray-500 dark:text-gray-400 italic">
-                Cada equipo puede tener uno o varios representantes de la oficina.
+                Cada equipo puede tener uno o varios representantes.
                 Elige con sabiduría... o según tu equipo favorito. ¡Tú decides!
               </p>
 

@@ -3,7 +3,7 @@ import useQuinielaStore from "../store/quiniela";
 import { Calendar, UserPlus, Users, Crown, Trophy, MessageSquareCode, CalendarDays } from "lucide-react";
 
 const Dashboard = () => {
-  const { matches, teams, setActiveTab } = useQuinielaStore();
+  const { matches, teams, setActiveTab, myRegistration } = useQuinielaStore();
 
   const getTeam = (id: string | null) => teams.find((t) => t.id === id);
 
@@ -158,12 +158,14 @@ const Dashboard = () => {
             hasta la final!
           </p>
           <div className="flex flex-wrap justify-center md:justify-start gap-4">
-            <button
-              onClick={() => setActiveTab("register")}
-              className="px-5 py-2.5 rounded-xl bg-emerald-500 text-white hover:bg-emerald-600 dark:hover:bg-emerald-400 font-bold shadow-lg shadow-emerald-500/20 transition flex items-center gap-2"
-            >
-              <UserPlus className="w-4 h-4" /> Unirme a la Quiniela
-            </button>
+            {!myRegistration && (
+              <button
+                onClick={() => setActiveTab("register")}
+                className="px-5 py-2.5 rounded-xl bg-emerald-500 text-white hover:bg-emerald-600 dark:hover:bg-emerald-400 font-bold shadow-lg shadow-emerald-500/20 transition flex items-center gap-2"
+              >
+                <UserPlus className="w-4 h-4" /> Unirme a la Quiniela
+              </button>
+            )}
             <button
               onClick={() => setActiveTab("representantes")}
               className="px-5 py-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 font-bold transition flex items-center gap-2 border border-gray-200 dark:border-gray-700"
