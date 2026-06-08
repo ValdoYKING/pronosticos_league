@@ -1,23 +1,25 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Mail, KeyRound, LogIn, ArrowLeft, CheckCircle, Loader2, AlertCircle } from "lucide-react";
 import useQuinielaStore from "../store/quiniela";
+import useLoginModalStore from "../store/loginModal";
 import { toast } from "sonner";
 
-interface LoginAccessProps {
-  onClose: () => void;
-}
-
-const LoginAccess = ({ onClose }: LoginAccessProps) => {
+// Componente global que mantiene su propio estado y NO depende de Register
+const LoginModalInner = ({ onClose }: { onClose: () => void }) => {
   const { sendAccessCode, verifyAccessCode, loading } = useQuinielaStore();
   const [email, setEmail] = useState("");
   const [code, setCode] = useState(["", "", "", "", "", ""]);
   const [step, setStep] = useState<"email" | "code">("email");
   const [emailError, setEmailError] = useState("");
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const [mounted, setMounted] = useState(false);
 
-  // Focus first input of code when step changes
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   useEffect(() => {
     if (step === "code") {
       setTimeout(() => {
@@ -26,7 +28,6 @@ const LoginAccess = ({ onClose }: LoginAccessProps) => {
     }
   }, [step]);
 
-  // Prevent closing modal with Escape key while loading
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && loading) {
@@ -57,33 +58,30 @@ const LoginAccess = ({ onClose }: LoginAccessProps) => {
         setStep("code");
       }
     } catch (error) {
-      console.error("[LoginAccess] Error inesperado al enviar código:", error);
+      console.error("[LoginModal] Error inesperado al enviar código:", error);
       toast.error("Ocurrió un error inesperado. Intenta de nuevo.");
     }
   };
 
   const handleCodeChange = (index: number, value: string) => {
     if (value.length > 1) {
-      // Si pegan un código completo
       const digits = value.replace(/\D/g, "").split("").slice(0, 6);
       const newCode = [...code];
       digits.forEach((digit, i) => {
         if (i < 6) newCode[i] = digit;
       });
       setCode(newCode);
-      // Focus the last filled or next empty
       const lastIndex = Math.min(digits.length, 5);
       inputRefs.current[lastIndex]?.focus();
       return;
     }
 
-    if (value && !/^\d$/.test(value)) return; // Solo dígitos
+    if (value && !/^\d$/.test(value)) return;
 
     const newCode = [...code];
     newCode[index] = value;
     setCode(newCode);
 
-    // Auto-advance to next input
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
@@ -117,12 +115,6 @@ const LoginAccess = ({ onClose }: LoginAccessProps) => {
     setCode(["", "", "", "", "", ""]);
     setEmailError("");
   };
-
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   if (!mounted) return null;
 
@@ -176,7 +168,6 @@ const LoginAccess = ({ onClose }: LoginAccessProps) => {
         {/* Body */}
         <div className="px-6 py-6 space-y-5">
           {step === "email" ? (
-            /* STEP 1: Ingresar correo */
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">
@@ -233,7 +224,6 @@ const LoginAccess = ({ onClose }: LoginAccessProps) => {
               </button>
             </div>
           ) : (
-            /* STEP 2: Ingresar código */
             <div className="space-y-5">
               <div className="text-center space-y-2">
                 <div className="w-14 h-14 mx-auto rounded-full bg-emerald-100 dark:bg-emerald-500/10 flex items-center justify-center">
@@ -250,7 +240,6 @@ const LoginAccess = ({ onClose }: LoginAccessProps) => {
                 </p>
               </div>
 
-              {/* Code Input */}
               <div className="flex justify-center gap-2">
                 {code.map((digit, index) => (
                   <input
@@ -273,7 +262,6 @@ const LoginAccess = ({ onClose }: LoginAccessProps) => {
                 ))}
               </div>
 
-              {/* Actions */}
               <div className="space-y-3">
                 <button
                   onClick={(e) => {
@@ -318,7 +306,7 @@ const LoginAccess = ({ onClose }: LoginAccessProps) => {
                       try {
                         await sendAccessCode(email);
                       } catch (error) {
-                        console.error("[LoginAccess] Error al reenviar código:", error);
+                        console.error("[LoginModal] Error al reenviar código:", error);
                       }
                     }}
                     className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
@@ -331,7 +319,6 @@ const LoginAccess = ({ onClose }: LoginAccessProps) => {
           )}
         </div>
 
-        {/* Footer */}
         <div className="px-6 py-4 bg-gray-50 dark:bg-gray-950/50 border-t border-gray-200 dark:border-gray-800">
           <p className="text-[10px] text-gray-400 dark:text-gray-500 text-center">
             Este acceso es para participantes ya registrados. Si aún no te has registrado, vuelve a la pestaña &quot;Registrarme&quot;.
@@ -343,4 +330,12 @@ const LoginAccess = ({ onClose }: LoginAccessProps) => {
   );
 };
 
-export default LoginAccess;
+const LoginModal = () => {
+  const { isOpen, close } = useLoginModalStore();
+
+  if (!isOpen) return null;
+
+  return <LoginModalInner onClose={close} />;
+};
+
+export default LoginModal;

@@ -7,6 +7,7 @@ import Dashboard from "./components/Dashboard";
 import Register from "./components/Register";
 import Representantes from "./components/Representantes";
 import Admin from "./components/Admin";
+import LoginModal from "./components/LoginModal";
 
 export default function Home() {
   const {
@@ -50,6 +51,7 @@ export default function Home() {
   return (
     <>
       <Toaster richColors />
+      <LoginModal />
       <Layout
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -61,5 +63,3 @@ export default function Home() {
     </>
   );
 }
-
-

@@ -1,11 +1,10 @@
 /* eslint-disable @next/next/no-img-element */
 import { useState, useMemo } from "react";
 import useQuinielaStore from "../store/quiniela";
+import useLoginModalStore from "../store/loginModal";
 import { UserPlus, Mail, User, Camera, CheckCircle2, X, LogIn } from "lucide-react";
 import { toast } from "sonner";
 import { GROUP_LABELS } from "../lib/mockData";
-import LoginAccess from "./LoginAccess";
-
 // Nueva función para enviar el correo
 const sendWelcomeEmail = async (to: string, userName: string) => {
   try {
@@ -45,7 +44,7 @@ const Register = () => {
   const [regPhotoBase64, setRegPhotoBase64] = useState("");
   const [regTeamIds, setRegTeamIds] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [showLoginModal, setShowLoginModal] = useState(false);
+  const { open: openLoginModal } = useLoginModalStore();
 
   // Detectar si el correo ingresado ya está registrado (para mostrar botón de acceso)
   const emailAlreadyRegistered = useMemo(() => {
@@ -186,11 +185,8 @@ const Register = () => {
       .filter(Boolean);
     return (
       <div className="space-y-6">
-        {showLoginModal && (
-          <LoginAccess onClose={() => setShowLoginModal(false)} />
-        )}
-        <div className="max-w-3xl mx-auto">
-          <div className="glass rounded-2xl p-6 sm:p-8 space-y-6 border border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-transparent">
+          <div className="max-w-3xl mx-auto">
+            <div className="glass rounded-2xl p-6 sm:p-8 space-y-6 border border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-transparent">
             <div className="text-center space-y-2">
               <h2 className="text-2xl font-extrabold text-gray-900 dark:text-white">
                 ¡Ya estás registrado! 🎉
@@ -268,11 +264,6 @@ const Register = () => {
 
   return (
     <div className="space-y-6">
-      {/* Modal de Login */}
-      {showLoginModal && (
-        <LoginAccess onClose={() => setShowLoginModal(false)} />
-      )}
-
       <div className="max-w-5xl mx-auto">
         <div className="glass rounded-2xl p-6 sm:p-8 space-y-8 border border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-transparent">
           <div className="text-center space-y-2">
@@ -293,7 +284,7 @@ const Register = () => {
             </div>
             <button
               type="button"
-              onClick={() => setShowLoginModal(true)}
+              onClick={openLoginModal}
               className="px-5 py-2 rounded-xl bg-amber-500 text-white hover:bg-amber-600 dark:hover:bg-amber-400 font-bold text-sm transition flex items-center gap-2 shadow-md shadow-amber-500/20 whitespace-nowrap"
             >
               <LogIn className="w-4 h-4" /> Ingresa a tu quiniela
@@ -368,7 +359,7 @@ const Register = () => {
                       </p>
                       <button
                         type="button"
-                        onClick={() => setShowLoginModal(true)}
+                        onClick={openLoginModal}
                         className="w-full py-2.5 rounded-xl bg-emerald-500 text-white hover:bg-emerald-600 dark:hover:bg-emerald-400 font-bold text-sm transition flex items-center justify-center gap-2 shadow-md shadow-emerald-500/20"
                       >
                         <LogIn className="w-4 h-4" /> Ya seleccionaste equipo, ingresa aquí
