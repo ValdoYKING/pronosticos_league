@@ -9,6 +9,12 @@ import {
 import { ThemeToggle } from "./ThemeToggle";
 import { useMemo } from "react";
 
+// 📧 Correos autorizados para ver la Consola Admin
+const ADMIN_EMAILS = [
+  "osvaldovm2002@gmail.com",
+  "osvaldovillalba-02@hotmail.com",
+];
+
 const Layout = ({
   activeTab,
   setActiveTab,
@@ -16,6 +22,9 @@ const Layout = ({
   getTeamById,
   children,
 }: any) => {
+  // Verificar si el usuario autenticado es admin
+  const isAdmin = myRegistration?.email && ADMIN_EMAILS.includes(myRegistration.email.toLowerCase());
+
   // Pre-compute user pill content to avoid hydration mismatches
   const userPillContent = useMemo(() => {
     if (!myRegistration) {
@@ -127,16 +136,18 @@ const Layout = ({
             >
               <Users className="w-4 h-4" /> Representantes
             </button>
-            <button
-              onClick={() => setActiveTab("admin")}
-              className={`px-3 py-2 rounded-t-lg text-sm font-semibold flex items-center gap-2 transition ${
-                activeTab === "admin"
-                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-b-2 border-amber-500"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/40 dark:hover:bg-gray-800/40"
-              }`}
-            >
-              <ShieldAlert className="w-4 h-4 text-amber-500 dark:text-amber-400" /> Consola Admin
-            </button>
+            {isAdmin && (
+              <button
+                onClick={() => setActiveTab("admin")}
+                className={`px-3 py-2 rounded-t-lg text-sm font-semibold flex items-center gap-2 transition ${
+                  activeTab === "admin"
+                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-b-2 border-amber-500"
+                    : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/40 dark:hover:bg-gray-800/40"
+                }`}
+              >
+                <ShieldAlert className="w-4 h-4 text-amber-500 dark:text-amber-400" /> Consola Admin
+              </button>
+            )}
           </nav>
 
           {/* User Pill Status & Theme Toggle */}
@@ -182,17 +193,19 @@ const Layout = ({
             <Users className="w-4 h-4" />
             <span>Representantes</span>
           </button>
-          <button
-            onClick={() => setActiveTab("admin")}
-            className={`flex flex-col items-center gap-1 ${
-              activeTab === "admin"
-                ? "text-amber-600 dark:text-amber-400"
-                : "text-gray-500 dark:text-gray-400"
-            }`}
-          >
-            <ShieldAlert className="w-4 h-4" />
-            <span>Admin</span>
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => setActiveTab("admin")}
+              className={`flex flex-col items-center gap-1 ${
+                activeTab === "admin"
+                  ? "text-amber-600 dark:text-amber-400"
+                  : "text-gray-500 dark:text-gray-400"
+              }`}
+            >
+              <ShieldAlert className="w-4 h-4" />
+              <span>Admin</span>
+            </button>
+          )}
         </div>
       </header>
 

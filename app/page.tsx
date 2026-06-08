@@ -9,6 +9,12 @@ import Representantes from "./components/Representantes";
 import Admin from "./components/Admin";
 import LoginModal from "./components/LoginModal";
 
+// 📧 Correos autorizados para ver la Consola Admin
+const ADMIN_EMAILS = [
+  "osvaldovm2002@gmail.com",
+  "osvaldovillalba-02@hotmail.com",
+];
+
 export default function Home() {
   const {
     activeTab,
@@ -24,7 +30,20 @@ export default function Home() {
     fetchInitialData();
   }, [fetchInitialData]);
 
+  // Redirigir a dashboard si un usuario no autorizado intenta acceder a admin
+  useEffect(() => {
+    if (activeTab === "admin") {
+      const userEmail = myRegistration?.email?.toLowerCase();
+      const isAuthorized = userEmail && ADMIN_EMAILS.includes(userEmail);
+      if (!isAuthorized) {
+        setActiveTab("dashboard");
+      }
+    }
+  }, [activeTab, myRegistration, setActiveTab]);
+
   const getTeamById = (id: string) => teams.find((team) => team.id === id);
+
+  const isAdmin = myRegistration?.email && ADMIN_EMAILS.includes(myRegistration.email.toLowerCase());
 
   const renderContent = () => {
     if (loading) {
@@ -42,7 +61,7 @@ export default function Home() {
       case "representantes":
         return <Representantes />;
       case "admin":
-        return <Admin />;
+        return isAdmin ? <Admin /> : <Dashboard />;
       default:
         return <Dashboard />;
     }
