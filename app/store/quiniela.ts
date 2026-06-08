@@ -396,7 +396,8 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
   },
 
   // ============================================================
-  // NUEVO: recalculateTournament
+  // recalculateTournament - con protección: si no hay resultados
+  // de grupos, no elimina equipos ni llena eliminatorias
   // ============================================================
   recalculateTournament: () => {
     set(state => {
@@ -431,7 +432,21 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
       }
       for (const t of teams) t.dif = t.gf! - t.gc!;
 
-      // === FASE 2: Determinar clasificados ===
+      // ════════════════════════════════════════════════════════════
+      // PROTECCIÓN: Si NO hay resultados de grupos, no se ejecuta
+      // la lógica de clasificación ni se llena el bracket.
+      // Todos los equipos se quedan en "Fase de Grupos" con status "activo".
+      // ════════════════════════════════════════════════════════════
+      const hayResultadosDeGrupos = groupMatches.length > 0;
+
+      if (!hayResultadosDeGrupos) {
+        // Sin resultados aún: equipos y participantes todos activos
+        const participants = state.participants.map(p => ({ ...p, status: 'activo' as const }));
+        let myRegistration = state.myRegistration ? { ...state.myRegistration, status: 'activo' as const } : null;
+        return { teams, matches, participants, myRegistration };
+      }
+
+      // === FASE 2: Determinar clasificados (solo si hay resultados) ===
       const qualified = computeQualifiedTeams(teams, matches);
 
       // Marcar equipos no clasificados como eliminados
