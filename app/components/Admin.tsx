@@ -254,7 +254,7 @@ const Admin = () => {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h2 className="text-2xl font-extrabold text-amber-600 dark:text-amber-400 flex items-center gap-2">
-              <ShieldAlert /> Consola del Administrador (RH / TI)
+              <ShieldAlert /> Consola del Administrador
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-300">
               Registra los resultados de cada partido. Los ganadores avanzan automáticamente.

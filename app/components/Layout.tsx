@@ -225,13 +225,12 @@ const Layout = ({
       <footer className="mt-auto border-t border-gray-200 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-950/60 py-6 text-center text-xs text-gray-500 dark:text-gray-500">
         <div className="max-w-7xl mx-auto px-4 space-y-2">
           <p>
-            La Quiniela 2026. Diseñada exclusivamente con fines
-            recreativos de integración corporativa.
+            La Quiniela 2026.
           </p>
-          <p className="text-[10px] text-gray-400 dark:text-gray-600">
+          {/* <p className="text-[10px] text-gray-400 dark:text-gray-600">
             Ningún post de Recursos Humanos fue alterado en la producción de
             este software.
-          </p>
+          </p> */}
         </div>
       </footer>
     </div>
