@@ -44,6 +44,7 @@ const Register = () => {
   const [regPhotoBase64, setRegPhotoBase64] = useState("");
   const [regTeamIds, setRegTeamIds] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const { open: openLoginModal } = useLoginModalStore();
 
   // Detectar si el correo ingresado ya está registrado (para mostrar botón de acceso)
@@ -249,12 +250,37 @@ const Register = () => {
             </div>
 
             <div className="flex flex-col sm:flex-row justify-center gap-3">
-              <button
-                onClick={deleteMyRegistration}
-                className="px-5 py-2.5 rounded-xl bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-500/30 hover:bg-red-200 dark:hover:bg-red-900/40 text-sm font-semibold transition flex items-center gap-2"
-              >
-                Eliminar Mi Registro
-              </button>
+              {!confirmDelete ? (
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  className="px-5 py-2.5 rounded-xl bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-500/30 hover:bg-red-200 dark:hover:bg-red-900/40 text-sm font-semibold transition flex items-center gap-2"
+                >
+                  Eliminar Mi Registro
+                </button>
+              ) : (
+                <div className="flex flex-col sm:flex-row items-center gap-2 p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-500/30">
+                  <span className="text-xs font-bold text-red-700 dark:text-red-400 whitespace-nowrap">
+                    ¿Eliminar definitivamente?
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        setConfirmDelete(false);
+                        deleteMyRegistration();
+                      }}
+                      className="px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition"
+                    >
+                      Sí, eliminar
+                    </button>
+                    <button
+                      onClick={() => setConfirmDelete(false)}
+                      className="px-4 py-1.5 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 text-xs font-semibold transition"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
