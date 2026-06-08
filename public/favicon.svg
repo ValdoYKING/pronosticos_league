@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#f59e0b"/>
+      <stop offset="100%" style="stop-color:#d97706"/>
+    </linearGradient>
+    <linearGradient id="cup" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#fbbf24"/>
+      <stop offset="100%" style="stop-color:#b45309"/>
+    </linearGradient>
+  </defs>
+  <!-- Copa -->
+  <path d="M28 14 L28 40 C28 54 42 60 50 62 C58 60 72 54 72 40 L72 14 Z" fill="url(#cup)" stroke="#92400e" stroke-width="2"/>
+  <!-- Base de la copa -->
+  <rect x="38" y="62" width="24" height="6" rx="2" fill="url(#gold)" stroke="#92400e" stroke-width="1.5"/>
+  <!-- Pie -->
+  <rect x="46" y="68" width="8" height="12" rx="2" fill="url(#gold)" stroke="#92400e" stroke-width="1.5"/>
+  <!-- Base inferior -->
+  <rect x="34" y="80" width="32" height="6" rx="3" fill="url(#gold)" stroke="#92400e" stroke-width="1.5"/>
+  <!-- Asas -->
+  <path d="M28 28 C18 28 16 38 22 42" fill="none" stroke="#d97706" stroke-width="3" stroke-linecap="round"/>
+  <path d="M72 28 C82 28 84 38 78 42" fill="none" stroke="#d97706" stroke-width="3" stroke-linecap="round"/>
+  <!-- Estrella en la copa -->
+  <polygon points="50,20 53,30 63,30 55,36 58,46 50,40 42,46 45,36 37,30 47,30" fill="#fef3c7" opacity="0.9"/>
+</svg>

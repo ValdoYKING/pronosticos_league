@@ -16,6 +16,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "La Quiniela 2026",
   description: "Quiniela Mundialista 2026",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
