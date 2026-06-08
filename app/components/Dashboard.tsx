@@ -126,7 +126,7 @@ const Dashboard = () => {
         </div>
         <div className="space-y-3 overflow-y-auto max-h-[450px] pr-1">{matchesForStage.map(m => renderMatch(m, sc))}</div>
       </div>
-    );
+    )
   };
 
   return (
