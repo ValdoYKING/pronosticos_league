@@ -1,10 +1,10 @@
 "use client";
 import { useState } from "react";
 import useQuinielaStore from "../store/quiniela";
-import { ShieldAlert, Sparkles, RefreshCw, Award, Trophy, Database, CheckCircle2, Loader2 } from "lucide-react";
+import { ShieldAlert, Sparkles, RefreshCw, Award, Trophy, Database, CheckCircle2, Loader2, UserPlus, Dices, Users } from "lucide-react";
 
 const Admin = () => {
-  const { matches, teams, setMatchResult, resetTournament, simulateRandom, getGroupStandings, syncMatchResultsFromSupabase, supabaseAvailable } = useQuinielaStore();
+  const { matches, teams, setMatchResult, resetTournament, simulateRandom, getGroupStandings, syncMatchResultsFromSupabase, supabaseAvailable, participants, setActiveTab } = useQuinielaStore();
   const [scores, setScores] = useState<Record<number, { a: number | string; b: number | string }>>({});
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
@@ -293,6 +293,63 @@ const Admin = () => {
           </div>
         </div>
 
+        {/* ============================================ */}
+        {/* GESTIÓN DE PARTICIPANTES */}
+        {/* ============================================ */}
+        <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-800">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
+            <Users className="text-emerald-500 dark:text-emerald-400" /> Gestión de Participantes
+          </h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Administra los participantes de la quiniela: {participants.length} registrados
+            ({participants.filter(p => !p.teamIds || p.teamIds.length === 0).length} sin equipo asignado).
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Botón: Registrar Nuevo Participante */}
+            <button
+              onClick={() => setActiveTab("register")}
+              className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-700/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition text-left"
+            >
+              <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                <UserPlus className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">Registrar Participante</p>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400">Dar de alta un nuevo usuario en la quiniela</p>
+              </div>
+            </button>
+
+            {/* Botón: Ir al Sorteo */}
+            <button
+              onClick={() => setActiveTab("sorteo")}
+              className="flex items-center gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-700/30 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition text-left"
+            >
+              <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                <Dices className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-amber-700 dark:text-amber-300">Sorteo de Equipos</p>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400">Tómbola para asignar equipos aleatorios</p>
+              </div>
+            </button>
+
+            {/* Botón: Ver Representantes */}
+            <button
+              onClick={() => setActiveTab("representantes")}
+              className="flex items-center gap-3 p-4 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-700/30 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition text-left"
+            >
+              <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-blue-700 dark:text-blue-300">Ver Participantes</p>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400">Lista completa de todos los representantes</p>
+              </div>
+            </button>
+          </div>
+        </div>
+
         {/* Tablas de grupos */}
         <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-800">
           <h3 className="text-lg font-bold text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
@@ -326,3 +383,4 @@ const Admin = () => {
 };
 
 export default Admin;
+
