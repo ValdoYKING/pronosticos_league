@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
 import { MOCK_MATCHES, MOCK_PARTICIPANTS, MOCK_TEAMS } from '../lib/mockData';
-import type { Team, Participant, Match } from '../lib/mockData';
+import type { Team, Participant, Match, OrdenSorteo } from '../lib/mockData';
 
 type QuinielaState = {
   activeTab: string;
@@ -10,6 +10,8 @@ type QuinielaState = {
   participants: Participant[];
   matches: Match[];
   myRegistration: Participant | null;
+  ordenSorteo: OrdenSorteo[];        // Las 48 posiciones de sorteo
+  posicionActual: number;            // Siguiente posición pendiente (1-48)
   loading: boolean;
   supabaseAvailable: boolean;
   supabaseResults: Record<number, { scoreA: number; scoreB: number; winnerId: string | null }>;
@@ -19,6 +21,13 @@ type QuinielaState = {
   registerUserWithoutTeams: (name: string, email: string, photoType: 'avatar' | 'upload', photo: string, drawCount?: number) => Promise<void>;
   assignRandomTeamToParticipant: (participantEmail: string) => Promise<{ team: any; assigned: boolean; isTopTeam?: boolean }>;
   deleteMyRegistration: () => Promise<void>;
+  // Acciones de orden de sorteo
+  fetchOrdenSorteo: () => Promise<void>;
+  getSiguientePendiente: () => OrdenSorteo | null;
+  asignarPosicionSorteo: (posicion: number, participantEmail: string, participantName: string) => Promise<void>;
+  completarPosicionSorteo: (posicion: number) => Promise<void>;
+  saltarPosicionSorteo: (posicion: number) => Promise<void>;
+  // Acciones de torneo
   setMatchResult: (matchId: number, scoreA: number, scoreB: number) => void;
   resetTournament: () => Promise<void>;
   simulateRandom: () => Promise<void>;
@@ -36,13 +45,6 @@ type QuinielaState = {
 // para mantener la sesión del usuario al recargar la página.
 // Los participantes se cargan siempre desde Supabase.
 // ============================================================
-
-function getNextOrdenPronostico(participants: Participant[]): number {
-  const maxOrden = participants.reduce((max, p) => {
-    return p.ordenPronostico && p.ordenPronostico > max ? p.ordenPronostico : max;
-  }, 0);
-  return maxOrden + 1;
-}
 
 function loadLocalRegistration(): Participant | null {
   try {
@@ -181,6 +183,8 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
   participants: MOCK_PARTICIPANTS,
   matches: MOCK_MATCHES,
   myRegistration: loadLocalRegistration(),
+  ordenSorteo: [],
+  posicionActual: 1,
   loading: false,
   supabaseAvailable: true,
   supabaseResults: {},
@@ -217,6 +221,7 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
           photo: p.photo_type === 'upload' && p.photo && p.photo.startsWith('http') ? p.photo : (p.photo && p.photo.length <= 2 ? p.photo : '💼'),
           status: 'activo',
           drawCount: p.draw_count ?? 1,
+          ordenesSorteo: p.ordenes_sorteo ?? undefined,
           ordenPronostico: p.orden_pronostico ?? undefined,
         }));
 
@@ -246,6 +251,9 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
 
     // Cargar resultados de partidos desde Supabase
     await get().syncMatchResultsFromSupabase();
+
+    // Cargar orden de sorteo desde Supabase
+    await get().fetchOrdenSorteo();
 
     set({ loading: false });
     get().recalculateTournament();
@@ -285,7 +293,6 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
         id: email, name, email, teamIds,
         photoType: finalPhotoType, photo: photoUrl, status: 'activo',
         drawCount: 1,
-        ordenPronostico: getNextOrdenPronostico(get().participants),
       };
 
       // Persistir en Supabase
@@ -364,7 +371,6 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
         teamIds: emptyTeamIds,
         photoType: finalPhotoType, photo: photoUrl, status: 'activo',
         drawCount: drawCount,
-        ordenPronostico: getNextOrdenPronostico(get().participants),
       };
 
       // Persistir en Supabase
@@ -375,7 +381,6 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
             name, team_ids: emptyTeamIds, team_id: null,
             photo_type: finalPhotoType, photo: photoUrl,
             draw_count: drawCount,
-            orden_pronostico: newParticipant.ordenPronostico,
             updated_at: new Date().toISOString(),
           }).eq('email', email);
         } else {
@@ -383,7 +388,6 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
             name, email, team_ids: emptyTeamIds, team_id: null,
             photo_type: finalPhotoType, photo: photoUrl,
             draw_count: drawCount,
-            orden_pronostico: newParticipant.ordenPronostico,
           });
         }
       } catch (error) {
@@ -527,6 +531,17 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
 
     get().recalculateTournament();
     
+    // Marcar la posición actual como completada en la tabla orden_sorteo
+    const { posicionActual, ordenSorteo } = get();
+    const posicionCompletar = ordenSorteo.find(o => 
+      o.posicion === posicionActual && 
+      o.participantEmail === participantEmail && 
+      o.status === 'pendiente'
+    );
+    if (posicionCompletar) {
+      await get().completarPosicionSorteo(posicionCompletar.posicion);
+    }
+    
     // Mensaje especial si fue compensación
     if (isCompensationEligible && TOP_TEAM_IDS.includes(selectedTeam.id)) {
       toast.success(`🎯 ¡Compensación activada! ${participant.name} recibe a ${selectedTeam.flag} ${selectedTeam.name} como equipo estrella.`, {
@@ -557,6 +572,158 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
     }
     get().recalculateTournament();
     toast.warning('Tu registro ha sido eliminado de la quiniela.');
+  },
+
+  // ============================================================
+  // fetchOrdenSorteo - Carga las 48 posiciones desde Supabase
+  // ============================================================
+  fetchOrdenSorteo: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('orden_sorteo')
+        .select('*')
+        .order('posicion', { ascending: true });
+
+      if (error) {
+        console.warn('[fetchOrdenSorteo] Error:', error.message);
+        return;
+      }
+
+      if (data) {
+        const mapped: OrdenSorteo[] = data.map((row: any) => ({
+          id: row.id,
+          posicion: row.posicion,
+          participantEmail: row.participant_email,
+          participantName: row.participant_name,
+          status: row.status,
+        }));
+
+        // Calcular la siguiente posición pendiente
+        const nextPendiente = mapped.find(o => o.status === 'pendiente');
+
+        set({
+          ordenSorteo: mapped,
+          posicionActual: nextPendiente?.posicion ?? (mapped.length > 0 ? mapped[mapped.length - 1].posicion + 1 : 1),
+        });
+      }
+    } catch (err) {
+      console.warn('[fetchOrdenSorteo] Error:', err);
+    }
+  },
+
+  // ============================================================
+  // getSiguientePendiente - Retorna la siguiente posición pendiente
+  // o null si ya no hay más
+  // ============================================================
+  getSiguientePendiente: () => {
+    const { ordenSorteo } = get();
+    const pendiente = ordenSorteo.find(o => o.status === 'pendiente');
+    return pendiente || null;
+  },
+
+  // ============================================================
+  // asignarPosicionSorteo - Asigna un participante a una posición
+  // ============================================================
+  asignarPosicionSorteo: async (posicion, participantEmail, participantName) => {
+    try {
+      const { error } = await supabase
+        .from('orden_sorteo')
+        .upsert({
+          posicion,
+          participant_email: participantEmail,
+          participant_name: participantName,
+          status: 'pendiente',
+        }, { onConflict: 'posicion' });
+
+      if (error) {
+        toast.error(`Error al asignar posición #${posicion}: ${error.message}`);
+        return;
+      }
+
+      // Actualizar store local
+      set(state => {
+        const existing = state.ordenSorteo.findIndex(o => o.posicion === posicion);
+        const newItem: OrdenSorteo = {
+          id: existing >= 0 ? state.ordenSorteo[existing].id : Date.now(),
+          posicion,
+          participantEmail,
+          participantName,
+          status: 'pendiente',
+        };
+
+        let ordenSorteo: OrdenSorteo[];
+        if (existing >= 0) {
+          ordenSorteo = [...state.ordenSorteo];
+          ordenSorteo[existing] = newItem;
+        } else {
+          ordenSorteo = [...state.ordenSorteo, newItem].sort((a, b) => a.posicion - b.posicion);
+        }
+
+        return { ordenSorteo };
+      });
+    } catch (err) {
+      console.warn('[asignarPosicionSorteo] Error:', err);
+    }
+  },
+
+  // ============================================================
+  // completarPosicionSorteo - Marca una posición como completada
+  // ============================================================
+  completarPosicionSorteo: async (posicion) => {
+    try {
+      const { error } = await supabase
+        .from('orden_sorteo')
+        .update({ status: 'completado', updated_at: new Date().toISOString() })
+        .eq('posicion', posicion);
+
+      if (error) {
+        console.warn('[completarPosicionSorteo] Error:', error.message);
+        return;
+      }
+
+      set(state => {
+        const ordenSorteo = state.ordenSorteo.map(o =>
+          o.posicion === posicion ? { ...o, status: 'completado' as const } : o
+        );
+        const siguiente = ordenSorteo.find(o => o.status === 'pendiente');
+        return {
+          ordenSorteo,
+          posicionActual: siguiente?.posicion ?? (ordenSorteo.length > 0 ? ordenSorteo[ordenSorteo.length - 1].posicion + 1 : 1),
+        };
+      });
+    } catch (err) {
+      console.warn('[completarPosicionSorteo] Error:', err);
+    }
+  },
+
+  // ============================================================
+  // saltarPosicionSorteo - Marca una posición como saltada
+  // ============================================================
+  saltarPosicionSorteo: async (posicion) => {
+    try {
+      const { error } = await supabase
+        .from('orden_sorteo')
+        .update({ status: 'saltado', updated_at: new Date().toISOString() })
+        .eq('posicion', posicion);
+
+      if (error) {
+        console.warn('[saltarPosicionSorteo] Error:', error.message);
+        return;
+      }
+
+      set(state => {
+        const ordenSorteo = state.ordenSorteo.map(o =>
+          o.posicion === posicion ? { ...o, status: 'saltado' as const } : o
+        );
+        const siguiente = ordenSorteo.find(o => o.status === 'pendiente');
+        return {
+          ordenSorteo,
+          posicionActual: siguiente?.posicion ?? (ordenSorteo.length > 0 ? ordenSorteo[ordenSorteo.length - 1].posicion + 1 : 1),
+        };
+      });
+    } catch (err) {
+      console.warn('[saltarPosicionSorteo] Error:', err);
+    }
   },
 
   // ============================================================
