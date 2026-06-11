@@ -35,12 +35,15 @@ const Sorteo = () => {
 
   // Participantes DISPONIBLES para sorteo (los que aún necesitan equipos)
   // Regla: teamIds.length < drawCount (aún no ha recibido todos los equipos que debe)
+  // Orden: por ordenPronostico ascendente (primero en registrarse, primero en ser sorteado)
   const participantsAvailable = useMemo(() => {
-    return participants.filter(p => {
-      const needed = p.drawCount ?? 1;
-      const have = (p.teamIds || []).length;
-      return have < needed;
-    });
+    return participants
+      .filter(p => {
+        const needed = p.drawCount ?? 1;
+        const have = (p.teamIds || []).length;
+        return have < needed;
+      })
+      .sort((a, b) => (a.ordenPronostico ?? Infinity) - (b.ordenPronostico ?? Infinity));
   }, [participants]);
 
   // Participantes COMPLETOS (ya tienen todos los equipos que necesitan)
@@ -121,26 +124,27 @@ const Sorteo = () => {
     setSpinPhase("shuffling");
     setAnimationProgress(0);
 
+    // Elegir el ganador: el primero con menor ordenPronostico
+    // (ya están ordenados por ordenPronostico ascendente)
+    const winner = participantsAvailable[0];
+    setSelectedWinner(winner);
+    setDisplayName(winner.name);
+
     // ============================================================
     // FASE 1: Animación de "papelitos" mezclándose (~2 segundos)
+    // Muestra el nombre del siguiente en orden
     // ============================================================
     let shuffleCount = 0;
     const totalShuffles = 20;
 
     shuffleRef.current = setInterval(() => {
       shuffleCount++;
-      const randomParticipant = participantsAvailable[Math.floor(Math.random() * participantsAvailable.length)];
-      setDisplayName(randomParticipant.name);
+      setDisplayName(winner.name);
       setAnimationProgress((shuffleCount / totalShuffles) * 100);
 
       if (shuffleCount >= totalShuffles) {
         clearInterval(shuffleRef.current!);
         shuffleRef.current = null;
-        
-        // Elegir el ganador (se mantiene oculto hasta el final)
-        const winner = participantsAvailable[Math.floor(Math.random() * participantsAvailable.length)];
-        setSelectedWinner(winner);
-        setDisplayName(winner.name);
         
         // ============================================================
         // FASE 2: Ruleta de equipos (~7 segundos)
@@ -616,11 +620,14 @@ const Sorteo = () => {
             </div>
           ) : (
             <div className="flex flex-wrap gap-2">
-              {participantsAvailable.map(p => {
+              {participantsAvailable.map((p, idx) => {
                 const needed = p.drawCount ?? 1;
                 const have = (p.teamIds || []).length;
                 return (
                   <span key={p.email} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-500/20 text-xs font-semibold text-amber-700 dark:text-amber-300">
+                    <span className="text-[8px] font-bold text-amber-500 dark:text-amber-400 bg-amber-100 dark:bg-amber-500/10 px-1 py-0.2 rounded min-w-[18px] text-center">
+                      #{idx + 1}
+                    </span>
                     {p.photoType === "upload" && p.photo && p.photo !== '💼' && p.photo.startsWith('http') ? (
                       <img src={p.photo} alt="" className="w-4 h-4 rounded-full object-cover" />
                     ) : (
