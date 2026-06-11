@@ -13,6 +13,8 @@ import { toast } from "sonner";
 const ADMIN_EMAILS = [
   "osvaldovm2002@gmail.com",
   "osvaldovillalba-02@hotmail.com",
+  "sebasduranarriola@gmail.com",
+  "dulce.mg.19@gmail.com"
 ];
 
 const Register = () => {
