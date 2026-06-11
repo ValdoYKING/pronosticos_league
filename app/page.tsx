@@ -14,6 +14,8 @@ import LoginModal from "./components/LoginModal";
 const ADMIN_EMAILS = [
   "osvaldovm2002@gmail.com",
   "osvaldovillalba-02@hotmail.com",
+  "sebasduranarriola@gmail.com",
+  "dulce.mg.19@gmail.com"
 ];
 
 export default function Home() {
