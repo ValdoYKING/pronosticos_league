@@ -16,6 +16,8 @@ type QuinielaState = {
   setActiveTab: (tab: string) => void;
   fetchInitialData: () => Promise<void>;
   registerUser: (name: string, email: string, teamIds: string[], photoType: 'avatar' | 'upload', photo: string) => Promise<void>;
+  registerUserWithoutTeams: (name: string, email: string, photoType: 'avatar' | 'upload', photo: string, drawCount?: number) => Promise<void>;
+  assignRandomTeamToParticipant: (participantEmail: string) => Promise<{ team: any; assigned: boolean; isTopTeam?: boolean }>;
   deleteMyRegistration: () => Promise<void>;
   setMatchResult: (matchId: number, scoreA: number, scoreB: number) => void;
   resetTournament: () => Promise<void>;
@@ -24,25 +26,16 @@ type QuinielaState = {
   getGroupStandings: (group: string) => (Team & { pts: number; pj: number; pg: number; pe: number; pp: number; gf: number; gc: number; dif: number })[];
   sendAccessCode: (email: string) => Promise<boolean>;
   verifyAccessCode: (email: string, code: string) => Promise<boolean>;
+  verifyAccessByName: (email: string) => Promise<boolean>;
   syncMatchResultsFromSupabase: () => Promise<void>;
   saveMatchResultToSupabase: (matchId: number, scoreA: number, scoreB: number, winnerId: string | null, updatedBy: string) => Promise<void>;
 };
 
-// Helpers de localStorage
-function loadLocalParticipants(): Participant[] {
-  try {
-    const stored = localStorage.getItem('quiniela_participants');
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveLocalParticipants(participants: Participant[]) {
-  try {
-    localStorage.setItem('quiniela_participants', JSON.stringify(participants));
-  } catch { /* ignore */ }
-}
+// ============================================================
+// HELPERS - Solo se persiste myRegistration en localStorage
+// para mantener la sesión del usuario al recargar la página.
+// Los participantes se cargan siempre desde Supabase.
+// ============================================================
 
 function loadLocalRegistration(): Participant | null {
   try {
@@ -67,6 +60,13 @@ const accessCodes: Record<string, { code: string; expiresAt: number }> = {};
 
 function generateRandomCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+// Limpieza de datos obsoletos de participantes en localStorage
+function clearObsoleteParticipantsCache() {
+  try {
+    localStorage.removeItem('quiniela_participants');
+  } catch { /* ignore */ }
 }
 
 // ============================================================
@@ -144,6 +144,30 @@ function computeQualifiedTeams(teams: Team[], matches: Match[]): string[] {
   return [...topTwo, ...bestThirds];
 }
 
+// ============================================================
+// TOP TEAMS - Equipos "estrella" para compensación
+// Un participante con drawCount >= 2 que NO haya recibido
+// un top_team en su primer sorteo, recibirá uno en el segundo
+// (máximo 1 top_team por participante)
+// ============================================================
+const TOP_TEAM_IDS = [
+  'ARG', // Argentina
+  'BRA', // Brasil
+  'FRA', // Francia
+  'GER', // Alemania
+  'ESP', // España
+  'ENG', // Inglaterra
+  'POR', // Portugal
+  'NED', // Países Bajos
+  'BEL', // Bélgica
+  'ITA', // Italia
+  'URU', // Uruguay
+  'CRO', // Croacia
+  'MEX', // México
+  'JPN', // Japón
+  'USA', // Estados Unidos
+];
+
 const useQuinielaStore = create<QuinielaState>((set, get) => ({
   activeTab: 'dashboard',
   teams: MOCK_TEAMS,
@@ -157,13 +181,13 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
   setActiveTab: (tab) => set({ activeTab: tab }),
 
   fetchInitialData: async () => {
-    const localParticipants = loadLocalParticipants();
-    const localRegistration = loadLocalRegistration();
-    if (localParticipants.length > 0) {
-      set({ participants: localParticipants, myRegistration: localRegistration });
-    }
-    if (localRegistration) {
-      set({ myRegistration: localRegistration });
+    // Limpiar datos obsoletos de participantes en localStorage
+    clearObsoleteParticipantsCache();
+
+    // Restaurar sesión desde localStorage mientras se cargan datos frescos
+    const savedRegistration = loadLocalRegistration();
+    if (savedRegistration) {
+      set({ myRegistration: savedRegistration });
     }
 
     try {
@@ -172,52 +196,41 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
         .select('*');
 
       if (participantsError) {
-        set({ supabaseAvailable: false });
-      } else if (participantsData) {
-        const mappedParticipants: Participant[] = participantsData.map((p: any) => {
-          let finalPhotoType = p.photo_type || 'avatar';
-          let finalPhoto = p.photo || null;
-          if (!finalPhoto || finalPhoto.length <= 2) {
-            const localData = localParticipants.find(lp => lp.email === p.email);
-            if (localData && localData.photoType === 'upload' && localData.photo && localData.photo.length > 2) {
-              finalPhotoType = localData.photoType;
-              finalPhoto = localData.photo;
-            } else {
-              finalPhoto = '💼';
-              if (finalPhotoType === 'upload') finalPhotoType = 'avatar';
-            }
-          }
-          if (finalPhotoType === 'upload' && finalPhoto !== '💼' && !finalPhoto.startsWith('http') && !finalPhoto.startsWith('data:')) {
-            finalPhotoType = 'avatar';
-            finalPhoto = '💼';
-          }
-          return {
-            id: p.email || p.id,
-            name: p.name,
-            email: p.email,
-            teamIds: p.team_ids || [p.team_id].filter(Boolean),
-            photoType: finalPhotoType,
-            photo: finalPhoto,
-            status: 'activo',
-          };
-        });
+        set({ supabaseAvailable: false, loading: false });
+        return;
+      }
 
-        const mergedParticipants = [...mappedParticipants];
-        for (const localP of localParticipants) {
-          if (!mergedParticipants.some(mp => mp.email === localP.email)) {
-            mergedParticipants.push(localP);
-          }
-        }
-        saveLocalParticipants(mergedParticipants);
-        const myReg = localRegistration?.email
-          ? mergedParticipants.find(p => p.email === localRegistration.email)
+      if (participantsData) {
+        const mappedParticipants: Participant[] = participantsData.map((p: any) => ({
+          id: p.email || p.id,
+          name: p.name,
+          email: p.email,
+          teamIds: p.team_ids || (p.team_id ? [p.team_id] : []),
+          photoType: p.photo_type === 'upload' && p.photo && p.photo.startsWith('http') ? 'upload' : 'avatar',
+          photo: p.photo_type === 'upload' && p.photo && p.photo.startsWith('http') ? p.photo : (p.photo && p.photo.length <= 2 ? p.photo : '💼'),
+          status: 'activo',
+          drawCount: p.draw_count ?? 1,
+        }));
+
+        // Sincronizar myRegistration con datos frescos de Supabase
+        const myReg = savedRegistration?.email
+          ? mappedParticipants.find(p => p.email === savedRegistration.email)
           : null;
-        if (myReg) saveLocalRegistration(myReg);
+        if (myReg) {
+          saveLocalRegistration(myReg);
+          set({ myRegistration: myReg });
+        } else if (savedRegistration) {
+          // El usuario ya no existe en BD, limpiar sesión
+          saveLocalRegistration(null);
+          set({ myRegistration: null });
+        }
+
         set({
-          participants: mergedParticipants,
-          myRegistration: myReg || localRegistration,
+          participants: mappedParticipants,
           supabaseAvailable: true,
         });
+      } else {
+        set({ supabaseAvailable: true, participants: [] });
       }
     } catch {
       set({ supabaseAvailable: false });
@@ -263,29 +276,31 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
       const newParticipant: Participant = {
         id: email, name, email, teamIds,
         photoType: finalPhotoType, photo: photoUrl, status: 'activo',
+        drawCount: 1,
       };
 
-      if (get().supabaseAvailable) {
-        try {
-          const { data: existingReg } = await supabase.from('participants').select('id').eq('email', email).maybeSingle();
-          if (existingReg) {
-            await supabase.from('participants').update({
-              name, team_ids: teamIds, team_id: teamIds[0] || null,
-              photo_type: finalPhotoType, photo: photoUrl, updated_at: new Date().toISOString(),
-            }).eq('email', email);
-          } else {
-            await supabase.from('participants').insert({
-              name, email, team_ids: teamIds, team_id: teamIds[0] || null,
-              photo_type: finalPhotoType, photo: photoUrl,
-            });
-          }
-        } catch { /* fallback a localStorage */ }
+      // Persistir en Supabase
+      try {
+        const { data: existingReg } = await supabase.from('participants').select('id').eq('email', email).maybeSingle();
+        if (existingReg) {
+          await supabase.from('participants').update({
+            name, team_ids: teamIds, team_id: teamIds[0] || null,
+            photo_type: finalPhotoType, photo: photoUrl, draw_count: 1, updated_at: new Date().toISOString(),
+          }).eq('email', email);
+        } else {
+          await supabase.from('participants').insert({
+            name, email, team_ids: teamIds, team_id: teamIds[0] || null,
+            photo_type: finalPhotoType, photo: photoUrl, draw_count: 1,
+          });
+        }
+      } catch (error) {
+        toast.error('Error al conectar con la base de datos. Intenta de nuevo.');
+        return;
       }
 
       const state = get();
       const filteredParticipants = state.participants.filter(p => p.email !== email);
       const updatedParticipants = [...filteredParticipants, newParticipant];
-      saveLocalParticipants(updatedParticipants);
       saveLocalRegistration(newParticipant);
       set({ participants: updatedParticipants, myRegistration: newParticipant, activeTab: 'representantes' });
       get().recalculateTournament();
@@ -295,6 +310,219 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
     } catch (error) {
       toast.error('Error al registrar usuario. Intenta de nuevo.');
     }
+  },
+
+  // ============================================================
+  // registerUserWithoutTeams - Registra solo nombre + avatar
+  // Sin selección de equipos (se asignarán en el sorteo)
+  // Acepta drawCount opcional (por defecto 1)
+  // ============================================================
+  registerUserWithoutTeams: async (name, email, photoType, photo, drawCount = 1) => {
+    try {
+      let finalPhotoType = photoType;
+      let photoUrl = photo;
+
+      if (photoType === 'upload' && photo.startsWith('data:')) {
+        try {
+          const response = await fetch(photo);
+          const blob = await response.blob();
+          const fileExt = blob.type.split('/')[1] || 'png';
+          const fileName = `${Date.now()}_${name.replace(/[^a-zA-Z0-9]/g, '_')}.${fileExt}`;
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('participant-photos')
+            .upload(fileName, blob, { contentType: blob.type, upsert: true });
+          if (uploadError) {
+            finalPhotoType = 'avatar';
+            photoUrl = '💼';
+          } else {
+            const { data: urlData } = supabase.storage.from('participant-photos').getPublicUrl(fileName);
+            photoUrl = urlData.publicUrl;
+          }
+        } catch {
+          finalPhotoType = 'avatar';
+          photoUrl = '💼';
+        }
+      }
+      if (finalPhotoType === 'upload' && (photoUrl.length <= 2 || photoUrl === '💼')) {
+        finalPhotoType = 'avatar';
+      }
+
+      // Sin equipos todavía
+      const emptyTeamIds: string[] = [];
+
+      const newParticipant: Participant = {
+        id: email, name, email,
+        teamIds: emptyTeamIds,
+        photoType: finalPhotoType, photo: photoUrl, status: 'activo',
+        drawCount: drawCount,
+      };
+
+      // Persistir en Supabase
+      try {
+        const { data: existingReg } = await supabase.from('participants').select('id').eq('email', email).maybeSingle();
+        if (existingReg) {
+          await supabase.from('participants').update({
+            name, team_ids: emptyTeamIds, team_id: null,
+            photo_type: finalPhotoType, photo: photoUrl,
+            draw_count: drawCount,
+            updated_at: new Date().toISOString(),
+          }).eq('email', email);
+        } else {
+          await supabase.from('participants').insert({
+            name, email, team_ids: emptyTeamIds, team_id: null,
+            photo_type: finalPhotoType, photo: photoUrl,
+            draw_count: drawCount,
+          });
+        }
+      } catch (error) {
+        toast.error('Error al conectar con la base de datos. Intenta de nuevo.');
+        return;
+      }
+
+      const state = get();
+      const filteredParticipants = state.participants.filter(p => p.email !== email);
+      const updatedParticipants = [...filteredParticipants, newParticipant];
+      set({ participants: updatedParticipants });
+      get().recalculateTournament();
+      
+    } catch (error) {
+      toast.error('Error al registrar usuario. Intenta de nuevo.');
+    }
+  },
+
+  // ============================================================
+  // assignRandomTeamToParticipant - Asigna un equipo aleatorio
+  // a un participante. Solo asigna equipos que NO tengan
+  // representante aún (equipos disponibles).
+  //
+  // REGLA DE COMPENSACIÓN (TOP TEAMS):
+  // - Si el participante tiene drawCount >= 2 y su primer equipo
+  //   NO fue un top_team, en su segundo sorteo se le asigna
+  //   automáticamente un top_team disponible.
+  // - Máximo 1 top_team por participante.
+  // - Si ningún top_team está disponible, se asigna uno normal.
+  //
+  // Además, actualiza el avatar del participante con la bandera
+  // del equipo que le tocó.
+  // ============================================================
+  assignRandomTeamToParticipant: async (participantEmail: string) => {
+    const state = get();
+    const participant = state.participants.find(p => p.email === participantEmail);
+    if (!participant) {
+      toast.error('Participante no encontrado.');
+      return { team: null, assigned: false };
+    }
+
+    const allTeams = state.teams;
+    const currentTeamIds = participant.teamIds || [];
+    const drawCount = participant.drawCount ?? 1;
+    
+    // IDs de equipos que ya tienen representante
+    const assignedTeamIds = new Set<string>();
+    for (const p of state.participants) {
+      if (p.teamIds) {
+        for (const tid of p.teamIds) {
+          assignedTeamIds.add(tid);
+        }
+      }
+    }
+
+    // Equipos disponibles = todos - los que ya tienen representante
+    const availableTeams = allTeams.filter(t => !assignedTeamIds.has(t.id));
+
+    if (availableTeams.length === 0) {
+      toast.error('¡Todos los equipos ya tienen representante! No hay equipos disponibles.');
+      return { team: null, assigned: false };
+    }
+
+    // ============================================================
+    // LÓGICA DE COMPENSACIÓN CON TOP TEAMS
+    // ============================================================
+    let selectedTeam: any = null;
+
+    const alreadyHasTopTeam = currentTeamIds.some(tid => TOP_TEAM_IDS.includes(tid));
+
+    // ¿Este participante es candidato a compensación?
+    // drawCount >= 2, NO tiene top_team aún, y este es su segundo sorteo (o posterior)
+    const isCompensationEligible = drawCount >= 2 && !alreadyHasTopTeam && currentTeamIds.length > 0;
+
+    if (isCompensationEligible) {
+      // Filtrar top_teams disponibles
+      const availableTopTeams = availableTeams.filter(t => TOP_TEAM_IDS.includes(t.id));
+
+      if (availableTopTeams.length > 0) {
+        // Asignar un top_team aleatorio disponible
+        const randomTopIndex = Math.floor(Math.random() * availableTopTeams.length);
+        selectedTeam = availableTopTeams[randomTopIndex];
+      } else {
+        // No hay top_teams disponibles, asignar equipo normal
+        const randomIndex = Math.floor(Math.random() * availableTeams.length);
+        selectedTeam = availableTeams[randomIndex];
+      }
+    } else {
+      // Sorteo normal: cualquier equipo disponible
+      const randomIndex = Math.floor(Math.random() * availableTeams.length);
+      selectedTeam = availableTeams[randomIndex];
+    }
+
+    // Asignar el equipo al participante (agregar a su array)
+    const updatedTeamIds = [...currentTeamIds, selectedTeam.id];
+
+    // Actualizar el avatar del participante con la bandera del equipo asignado
+    const updatedPhotoType: 'avatar' | 'upload' = 'upload';
+    const updatedPhoto = selectedTeam.flagUrl;
+
+    // Actualizar en store
+    const updatedParticipants = state.participants.map(p => {
+      if (p.email === participantEmail) {
+        return {
+          ...p,
+          teamIds: updatedTeamIds,
+          photoType: updatedPhotoType,
+          photo: updatedPhoto,
+        };
+      }
+      return p;
+    });
+    
+    // Si el participante sorteado es el que tiene la sesión activa, también actualizar myRegistration
+    let updatedMyRegistration = state.myRegistration;
+    if (state.myRegistration?.email === participantEmail) {
+      updatedMyRegistration = {
+        ...state.myRegistration,
+        teamIds: updatedTeamIds,
+        photoType: updatedPhotoType,
+        photo: updatedPhoto,
+      };
+      saveLocalRegistration(updatedMyRegistration);
+    }
+
+    set({ participants: updatedParticipants, myRegistration: updatedMyRegistration });
+
+    // Persistir en Supabase
+    try {
+      const { data: existingReg } = await supabase.from('participants').select('id').eq('email', participantEmail).maybeSingle();
+      if (existingReg) {
+        await supabase.from('participants').update({
+          team_ids: updatedTeamIds,
+          team_id: updatedTeamIds[0] || null,
+          photo_type: updatedPhotoType,
+          photo: updatedPhoto,
+          updated_at: new Date().toISOString(),
+        }).eq('email', participantEmail);
+      }
+    } catch { /* ignore */ }
+
+    get().recalculateTournament();
+    
+    // Mensaje especial si fue compensación
+    if (isCompensationEligible && TOP_TEAM_IDS.includes(selectedTeam.id)) {
+      toast.success(`🎯 ¡Compensación activada! ${participant.name} recibe a ${selectedTeam.flag} ${selectedTeam.name} como equipo estrella.`, {
+        duration: 5000,
+      });
+    }
+    
+    return { team: selectedTeam, assigned: true, isTopTeam: TOP_TEAM_IDS.includes(selectedTeam.id) };
   },
 
   deleteMyRegistration: async () => {
@@ -309,12 +537,11 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
       try { await supabase.from('participants').delete().eq('email', myRegistration.email); } catch { /* ignore */ }
       const state = get();
       const updatedParticipants = state.participants.filter(p => p.email !== myRegistration.email);
-      saveLocalParticipants(updatedParticipants);
       saveLocalRegistration(null);
       set({ participants: updatedParticipants, myRegistration: null });
     } else {
-      set({ myRegistration: null });
       saveLocalRegistration(null);
+      set({ myRegistration: null });
     }
     get().recalculateTournament();
     toast.warning('Tu registro ha sido eliminado de la quiniela.');
@@ -718,6 +945,26 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
   },
 
   // ============================================================
+  // verifyAccessByName - Acceso directo por nombre (sin correo)
+  // Busca al participante por su email (ahora interno) y carga su sesión
+  // ============================================================
+  verifyAccessByName: async (email: string) => {
+    set({ loading: true });
+
+    const participant = get().participants.find(p => p.email.toLowerCase() === email.toLowerCase());
+
+    if (!participant) {
+      set({ loading: false });
+      toast.error('No se encontró tu registro.');
+      return false;
+    }
+
+    saveLocalRegistration(participant);
+    set({ myRegistration: participant, loading: false });
+    return true;
+  },
+
+  // ============================================================
   // Sincronizar resultados desde Supabase (match_results)
   // ============================================================
   syncMatchResultsFromSupabase: async () => {
@@ -725,7 +972,6 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
       const { data, error } = await supabase
         .from('match_results')
         .select('match_id, team_a_score, team_b_score, winner_id');
-
       if (error) {
         console.warn('[syncMatchResults] Error fetching from Supabase:', error.message);
         return;
@@ -804,3 +1050,4 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
 }));
 
 export default useQuinielaStore;
+
