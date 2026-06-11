@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 /* eslint-disable @next/next/no-img-element */
 import useQuinielaStore from "../store/quiniela";
-import { Calendar, UserPlus, Users, Crown, Trophy, MessageSquareCode, CalendarDays, Swords, Medal, Database, CheckCircle2 } from "lucide-react";
+import { Calendar, Users, Crown, Trophy, CalendarDays, Swords, Medal, Database, CheckCircle2 } from "lucide-react";
 import { GROUP_LABELS } from "../lib/mockData";
 
 const Dashboard = () => {
@@ -154,11 +154,6 @@ const Dashboard = () => {
             Los 2 primeros de cada grupo + los 8 mejores terceros lugares clasifican a Dieciseisavos de Final.
           </p>
           <div className="flex flex-wrap justify-center md:justify-start gap-4">
-            {(!hydrated || !myRegistration) && (
-              <button onClick={() => setActiveTab('register')} className="px-5 py-2.5 rounded-xl bg-emerald-500 text-white hover:bg-emerald-600 dark:hover:bg-emerald-400 font-bold shadow-lg shadow-emerald-500/20 transition flex items-center gap-2">
-                <UserPlus className="w-4 h-4" /> Unirme a la Quiniela
-              </button>
-            )}
             <button onClick={() => setActiveTab('representantes')} className="px-5 py-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 font-bold transition flex items-center gap-2 border border-gray-200 dark:border-gray-700">
               <Users className="w-4 h-4" /> Ver Representantes
             </button>
