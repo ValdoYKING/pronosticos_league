@@ -37,6 +37,13 @@ type QuinielaState = {
 // Los participantes se cargan siempre desde Supabase.
 // ============================================================
 
+function getNextOrdenPronostico(participants: Participant[]): number {
+  const maxOrden = participants.reduce((max, p) => {
+    return p.ordenPronostico && p.ordenPronostico > max ? p.ordenPronostico : max;
+  }, 0);
+  return maxOrden + 1;
+}
+
 function loadLocalRegistration(): Participant | null {
   try {
     const stored = localStorage.getItem('quiniela_my_registration');
@@ -210,6 +217,7 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
           photo: p.photo_type === 'upload' && p.photo && p.photo.startsWith('http') ? p.photo : (p.photo && p.photo.length <= 2 ? p.photo : '💼'),
           status: 'activo',
           drawCount: p.draw_count ?? 1,
+          ordenPronostico: p.orden_pronostico ?? undefined,
         }));
 
         // Sincronizar myRegistration con datos frescos de Supabase
@@ -277,6 +285,7 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
         id: email, name, email, teamIds,
         photoType: finalPhotoType, photo: photoUrl, status: 'activo',
         drawCount: 1,
+        ordenPronostico: getNextOrdenPronostico(get().participants),
       };
 
       // Persistir en Supabase
@@ -285,12 +294,12 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
         if (existingReg) {
           await supabase.from('participants').update({
             name, team_ids: teamIds, team_id: teamIds[0] || null,
-            photo_type: finalPhotoType, photo: photoUrl, draw_count: 1, updated_at: new Date().toISOString(),
+            photo_type: finalPhotoType, photo: photoUrl, draw_count: 1, orden_pronostico: newParticipant.ordenPronostico, updated_at: new Date().toISOString(),
           }).eq('email', email);
         } else {
           await supabase.from('participants').insert({
             name, email, team_ids: teamIds, team_id: teamIds[0] || null,
-            photo_type: finalPhotoType, photo: photoUrl, draw_count: 1,
+            photo_type: finalPhotoType, photo: photoUrl, draw_count: 1, orden_pronostico: newParticipant.ordenPronostico,
           });
         }
       } catch (error) {
@@ -355,6 +364,7 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
         teamIds: emptyTeamIds,
         photoType: finalPhotoType, photo: photoUrl, status: 'activo',
         drawCount: drawCount,
+        ordenPronostico: getNextOrdenPronostico(get().participants),
       };
 
       // Persistir en Supabase
@@ -365,6 +375,7 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
             name, team_ids: emptyTeamIds, team_id: null,
             photo_type: finalPhotoType, photo: photoUrl,
             draw_count: drawCount,
+            orden_pronostico: newParticipant.ordenPronostico,
             updated_at: new Date().toISOString(),
           }).eq('email', email);
         } else {
@@ -372,6 +383,7 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
             name, email, team_ids: emptyTeamIds, team_id: null,
             photo_type: finalPhotoType, photo: photoUrl,
             draw_count: drawCount,
+            orden_pronostico: newParticipant.ordenPronostico,
           });
         }
       } catch (error) {
