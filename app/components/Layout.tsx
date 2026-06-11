@@ -5,9 +5,14 @@ import {
   UserPlus,
   Users,
   ShieldAlert,
+  Dices,
+  LogOut,
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { useMemo, useState, useEffect } from "react";
+import useLoginModalStore from "../store/loginModal";
+import useQuinielaStore from "../store/quiniela";
+import { toast } from "sonner";
 
 // 📧 Correos autorizados para ver la Consola Admin
 const ADMIN_EMAILS = [
@@ -23,6 +28,8 @@ const Layout = ({
   children,
 }: any) => {
   const [mounted, setMounted] = useState(false);
+  const [showLogout, setShowLogout] = useState(false);
+  const { open: openLoginModal } = useLoginModalStore();
 
   useEffect(() => {
     setMounted(true);
@@ -35,10 +42,14 @@ const Layout = ({
   const userPillContent = useMemo(() => {
     if (!myRegistration) {
       return (
-        <div className="hidden sm:flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 font-medium bg-gray-100 dark:bg-gray-900 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-800">
+        <button
+          onClick={openLoginModal}
+          className="hidden sm:flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 font-medium bg-gray-100 dark:bg-gray-900 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:border-emerald-300 dark:hover:border-emerald-500/30 hover:text-emerald-600 dark:hover:text-emerald-400 transition-all cursor-pointer"
+          title="Acceder a tu quiniela"
+        >
           <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
           Sin Registro
-        </div>
+        </button>
       );
     }
 
@@ -70,22 +81,60 @@ const Layout = ({
         : "Eliminado";
 
     return (
-      <div className="flex items-center gap-2">
-        {photoElement}
-        <div className="hidden sm:block text-left">
-          <p className="text-xs font-semibold truncate max-w-[100px] text-gray-900 dark:text-gray-100">
-            {myRegistration.name}
-          </p>
-          <span
-            className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
-              myRegistration.status === "activo"
-                ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20"
-                : "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-500/20"
-            }`}
-          >
-            {statusText}
-          </span>
-        </div>
+      <div className="relative">
+        <button
+          onClick={() => setShowLogout(prev => !prev)}
+          className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
+          title="Haz clic para cerrar sesión"
+        >
+          {photoElement}
+          <div className="hidden sm:block text-left">
+            <p className="text-xs font-semibold truncate max-w-[100px] text-gray-900 dark:text-gray-100">
+              {myRegistration.name}
+            </p>
+            <span
+              className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
+                myRegistration.status === "activo"
+                  ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20"
+                  : "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-500/20"
+              }`}
+            >
+              {statusText}
+            </span>
+          </div>
+        </button>
+
+        {/* Dropdown de cierre de sesión */}
+        {showLogout && (
+          <>
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setShowLogout(false)}
+            />
+            <div className="absolute right-0 top-full mt-2 z-50 min-w-[180px] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-2xl overflow-hidden">
+              <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-800">
+                <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  {myRegistration.name}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowLogout(false);
+                  // Cerrar sesión: limpiar myRegistration
+                  try {
+                    localStorage.removeItem('quiniela_my_registration');
+                  } catch { /* ignore */ }
+                  useQuinielaStore.setState({ myRegistration: null });
+                  toast.success('Sesión cerrada');
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition font-semibold"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                Cerrar Sesión
+              </button>
+            </div>
+          </>
+        )}
       </div>
     );
   }, [myRegistration, getTeamById]);
@@ -122,16 +171,35 @@ const Layout = ({
             >
               <Calendar className="w-4 h-4" /> Fechas del Mundial
             </button>
-            <button
-              onClick={() => setActiveTab("register")}
-              className={`px-3 py-2 rounded-t-lg text-sm font-semibold flex items-center gap-2 transition ${
-                activeTab === "register"
-                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-b-2 border-emerald-500"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/40 dark:hover:bg-gray-800/40"
-              }`}
-            >
-              <UserPlus className="w-4 h-4" /> Registrarme
-            </button>
+
+            {/* Pestaña "Registrar" solo visible para admin autenticado */}
+            {mounted && isAdmin && (
+              <button
+                onClick={() => setActiveTab("register")}
+                className={`px-3 py-2 rounded-t-lg text-sm font-semibold flex items-center gap-2 transition ${
+                  activeTab === "register"
+                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-b-2 border-emerald-500"
+                    : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/40 dark:hover:bg-gray-800/40"
+                }`}
+              >
+                <UserPlus className="w-4 h-4" /> Registrar
+              </button>
+            )}
+
+            {/* Pestaña "Sorteo" solo visible para admin autenticado */}
+            {mounted && isAdmin && (
+              <button
+                onClick={() => setActiveTab("sorteo")}
+                className={`px-3 py-2 rounded-t-lg text-sm font-semibold flex items-center gap-2 transition ${
+                  activeTab === "sorteo"
+                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-b-2 border-amber-500"
+                    : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/40 dark:hover:bg-gray-800/40"
+                }`}
+              >
+                <Dices className="w-4 h-4" /> Sorteo
+              </button>
+            )}
+
             <button
               onClick={() => setActiveTab("representantes")}
               className={`px-3 py-2 rounded-t-lg text-sm font-semibold flex items-center gap-2 transition ${
@@ -178,17 +246,37 @@ const Layout = ({
             <Calendar className="w-4 h-4" />
             <span>Fechas</span>
           </button>
-          <button
-            onClick={() => setActiveTab("register")}
-            className={`flex flex-col items-center gap-1 ${
-              activeTab === "register"
-                ? "text-emerald-600 dark:text-emerald-400"
-                : "text-gray-500 dark:text-gray-400"
-            }`}
-          >
-            <UserPlus className="w-4 h-4" />
-            <span>Registrar</span>
-          </button>
+
+          {/* Pestaña "Registrar" solo para admin en móvil */}
+          {mounted && isAdmin && (
+            <button
+              onClick={() => setActiveTab("register")}
+              className={`flex flex-col items-center gap-1 ${
+                activeTab === "register"
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-gray-500 dark:text-gray-400"
+              }`}
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>Registrar</span>
+            </button>
+          )}
+
+          {/* Pestaña "Sorteo" solo para admin en móvil */}
+          {mounted && isAdmin && (
+            <button
+              onClick={() => setActiveTab("sorteo")}
+              className={`flex flex-col items-center gap-1 ${
+                activeTab === "sorteo"
+                  ? "text-amber-600 dark:text-amber-400"
+                  : "text-gray-500 dark:text-gray-400"
+              }`}
+            >
+              <Dices className="w-4 h-4" />
+              <span>Sorteo</span>
+            </button>
+          )}
+
           <button
             onClick={() => setActiveTab("representantes")}
             className={`flex flex-col items-center gap-1 ${
@@ -225,12 +313,16 @@ const Layout = ({
       <footer className="mt-auto border-t border-gray-200 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-950/60 py-6 text-center text-xs text-gray-500 dark:text-gray-500">
         <div className="max-w-7xl mx-auto px-4 space-y-2">
           <p>
-            La Quiniela 2026.
+            La Quiniela 2026{" "}
+            <button
+              onClick={openLoginModal}
+              className="text-transparent hover:text-gray-400 dark:hover:text-gray-500 transition-colors duration-300 cursor-pointer select-none"
+              title="Acceder a tu quiniela"
+              aria-label="Acceder a tu quiniela"
+            >
+              .
+            </button>
           </p>
-          {/* <p className="text-[10px] text-gray-400 dark:text-gray-600">
-            Ningún post de Recursos Humanos fue alterado en la producción de
-            este software.
-          </p> */}
         </div>
       </footer>
     </div>
