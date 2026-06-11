@@ -1,13 +1,15 @@
 "use client";
 import { useState } from "react";
 import useQuinielaStore from "../store/quiniela";
-import { ShieldAlert, Sparkles, RefreshCw, Award, Trophy, Database, CheckCircle2, Loader2, UserPlus, Dices, Users } from "lucide-react";
+import { ShieldAlert, Sparkles, RefreshCw, Award, Trophy, Database, CheckCircle2, Loader2, UserPlus, Dices, Users, ListOrdered } from "lucide-react";
+import OrdenSorteoAdmin from "./OrdenSorteoAdmin";
 
 const Admin = () => {
-  const { matches, teams, setMatchResult, resetTournament, simulateRandom, getGroupStandings, syncMatchResultsFromSupabase, supabaseAvailable, participants, setActiveTab } = useQuinielaStore();
+  const { matches, teams, setMatchResult, resetTournament, simulateRandom, getGroupStandings, syncMatchResultsFromSupabase, supabaseAvailable, participants, setActiveTab, ordenSorteo } = useQuinielaStore();
   const [scores, setScores] = useState<Record<number, { a: number | string; b: number | string }>>({});
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
+  const [showOrdenSorteo, setShowOrdenSorteo] = useState(false);
 
   const getTeam = (id: string | null) => teams.find(t => t.id === id);
 
@@ -306,6 +308,24 @@ const Admin = () => {
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Botón: Orden de Sorteo */}
+            <button
+              onClick={() => setShowOrdenSorteo(!showOrdenSorteo)}
+              className="flex items-center gap-3 p-4 rounded-xl bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-700/30 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition text-left"
+            >
+              <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                <ListOrdered className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-purple-700 dark:text-purple-300">
+                  {showOrdenSorteo ? 'Ocultar Orden' : 'Orden de Sorteo'}
+                </p>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                  {showOrdenSorteo ? 'Cerrar panel de posiciones' : `Gestionar las ${ordenSorteo.length} posiciones de sorteo`}
+                </p>
+              </div>
+            </button>
+
             {/* Botón: Registrar Nuevo Participante */}
             <button
               onClick={() => setActiveTab("register")}
@@ -378,6 +398,13 @@ const Admin = () => {
           </div>
         </div>
       </div>
+
+      {/* Panel de Orden de Sorteo */}
+      {showOrdenSorteo && (
+      <div className="mt-8">
+        <OrdenSorteoAdmin />
+      </div>
+      )}
     </div>
   );
 };
