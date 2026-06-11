@@ -24,6 +24,7 @@ export interface Participant {
   photoType: 'avatar' | 'upload';
   photo: string;
   status: 'activo' | 'eliminado';
+  drawCount?: number; // Cantidad de sorteos (veces que saldrá en la tómbola). Default: 1
 }
 
 export interface Match {
