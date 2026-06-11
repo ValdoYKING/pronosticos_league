@@ -7,9 +7,10 @@ import Dashboard from "./components/Dashboard";
 import Register from "./components/Register";
 import Representantes from "./components/Representantes";
 import Admin from "./components/Admin";
+import Sorteo from "./components/Sorteo";
 import LoginModal from "./components/LoginModal";
 
-// 📧 Correos autorizados para ver la Consola Admin
+// 📧 Correos autorizados para ver la Consola Admin y el panel de registro
 const ADMIN_EMAILS = [
   "osvaldovm2002@gmail.com",
   "osvaldovillalba-02@hotmail.com",
@@ -30,14 +31,13 @@ export default function Home() {
     fetchInitialData();
   }, [fetchInitialData]);
 
-  // Redirigir a dashboard si un usuario no autorizado intenta acceder a admin
+  // Redirigir a dashboard si un usuario no autorizado intenta acceder a admin, register o sorteo
   useEffect(() => {
-    if (activeTab === "admin") {
-      const userEmail = myRegistration?.email?.toLowerCase();
-      const isAuthorized = userEmail && ADMIN_EMAILS.includes(userEmail);
-      if (!isAuthorized) {
-        setActiveTab("dashboard");
-      }
+    const userEmail = myRegistration?.email?.toLowerCase();
+    const isAuthorized = userEmail && ADMIN_EMAILS.includes(userEmail);
+
+    if ((activeTab === "admin" || activeTab === "register" || activeTab === "sorteo") && !isAuthorized) {
+      setActiveTab("dashboard");
     }
   }, [activeTab, myRegistration, setActiveTab]);
 
@@ -57,7 +57,9 @@ export default function Home() {
       case "dashboard":
         return <Dashboard />;
       case "register":
-        return <Register />;
+        return isAdmin ? <Register /> : <Dashboard />;
+      case "sorteo":
+        return isAdmin ? <Sorteo /> : <Dashboard />;
       case "representantes":
         return <Representantes />;
       case "admin":
