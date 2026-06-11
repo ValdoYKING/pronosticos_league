@@ -2,6 +2,7 @@
 "use client";
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import useQuinielaStore from "../store/quiniela";
+import { Participant } from "../lib/mockData";
 import { 
   Dice5, Trophy, Users, RefreshCw, X, 
   PartyPopper, Loader2, Dices, ArrowRight
@@ -9,7 +10,13 @@ import {
 import { toast } from "sonner";
 
 const Sorteo = () => {
-  const { participants, teams, assignRandomTeamToParticipant } = useQuinielaStore();
+  const { 
+    participants, teams, 
+    assignRandomTeamToParticipant, 
+    ordenSorteo, 
+    posicionActual,
+    getSiguientePendiente 
+  } = useQuinielaStore();
   
   // Estado del sorteo
   const [isSpinning, setIsSpinning] = useState(false);
@@ -34,17 +41,31 @@ const Sorteo = () => {
   // ============================================================
 
   // Participantes DISPONIBLES para sorteo (los que aún necesitan equipos)
-  // Regla: teamIds.length < drawCount (aún no ha recibido todos los equipos que debe)
-  // Orden: por ordenPronostico ascendente (primero en registrarse, primero en ser sorteado)
+  // Se obtienen desde la tabla orden_sorteo: las posiciones pendientes ordenadas
+  const siguientePendiente = useMemo(() => getSiguientePendiente(), [ordenSorteo, getSiguientePendiente]);
+  
+  // Participantes que aún necesitan equipos, pero en el orden definido por orden_sorteo
   const participantsAvailable = useMemo(() => {
-    return participants
-      .filter(p => {
+    // Obtener las posiciones pendientes ordenadas
+    const pendientes = ordenSorteo
+      .filter(o => o.status === 'pendiente')
+      .sort((a, b) => a.posicion - b.posicion);
+    
+    // Mapear a participantes, manteniendo el orden de las posiciones
+    const result: { participant: Participant; posicion: number }[] = [];
+    for (const pos of pendientes) {
+      if (!pos.participantEmail) continue;
+      const p = participants.find(pp => pp.email === pos.participantEmail);
+      if (p) {
         const needed = p.drawCount ?? 1;
         const have = (p.teamIds || []).length;
-        return have < needed;
-      })
-      .sort((a, b) => (a.ordenPronostico ?? Infinity) - (b.ordenPronostico ?? Infinity));
-  }, [participants]);
+        if (have < needed) {
+          result.push({ participant: p, posicion: pos.posicion });
+        }
+      }
+    }
+    return result;
+  }, [ordenSorteo, participants]);
 
   // Participantes COMPLETOS (ya tienen todos los equipos que necesitan)
   const participantsCompleted = useMemo(() => {
@@ -115,18 +136,20 @@ const Sorteo = () => {
       return;
     }
 
-    setIsSpinning(true);
-    setShowWinner(false);
-    setCurrentWinner(null);
-    setAssignedTeam(null);
-    setSelectedWinner(null);
-    setDisplayFlagTeam(null);
-    setSpinPhase("shuffling");
-    setAnimationProgress(0);
+    // Buscar el siguiente pendiente desde la tabla orden_sorteo
+    const siguiente = getSiguientePendiente();
+    if (!siguiente || !siguiente.participantEmail) {
+      toast.warning("No hay más posiciones pendientes en el orden de sorteo. Ve a Registrar para asignar posiciones.");
+      return;
+    }
 
-    // Elegir el ganador: el primero con menor ordenPronostico
-    // (ya están ordenados por ordenPronostico ascendente)
-    const winner = participantsAvailable[0];
+    const winnerData = participantsAvailable.find(p => p.participant.email === siguiente.participantEmail);
+    if (!winnerData) {
+      toast.warning("El siguiente participante en orden ya tiene todos sus equipos. Verifica el orden de sorteo.");
+      return;
+    }
+
+    const winner = winnerData.participant;
     setSelectedWinner(winner);
     setDisplayName(winner.name);
 
@@ -292,12 +315,16 @@ const Sorteo = () => {
           {/* Estadísticas dinámicas */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="bg-white dark:bg-gray-950/50 rounded-xl p-4 border border-gray-200 dark:border-gray-800 text-center">
-              <p className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400">{participantsAvailable.length}</p>
-              <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold">Participantes<br/>disponibles</p>
+              <p className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400">
+                {ordenSorteo.filter(o => o.status === 'pendiente').length}
+              </p>
+              <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold">Sorteos<br/>pendientes</p>
             </div>
             <div className="bg-white dark:bg-gray-950/50 rounded-xl p-4 border border-gray-200 dark:border-gray-800 text-center">
-              <p className="text-2xl font-extrabold text-amber-600 dark:text-amber-400">{participantsCompleted.length}</p>
-              <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold">Participantes<br/>completos</p>
+              <p className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400">
+                {ordenSorteo.filter(o => o.status === 'completado').length}
+              </p>
+              <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold">Sorteos<br/>completados</p>
             </div>
             <div className="bg-white dark:bg-gray-950/50 rounded-xl p-4 border border-gray-200 dark:border-gray-800 text-center">
               <p className="text-2xl font-extrabold text-blue-600 dark:text-blue-400">{availableTeams.length}</p>
@@ -308,6 +335,20 @@ const Sorteo = () => {
               <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold">Equipos<br/>asignados</p>
             </div>
           </div>
+
+          {/* Barra de progreso del sorteo */}
+          {ordenSorteo.length > 0 && (
+            <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2 overflow-hidden">
+              <div 
+                className="h-full rounded-full bg-gradient-to-r from-emerald-500 via-teal-500 to-amber-500 transition-all duration-500"
+                style={{ width: `${(ordenSorteo.filter(o => o.status === 'completado').length / ordenSorteo.length) * 100}%` }}
+              />
+              <p className="text-[9px] text-gray-500 dark:text-gray-400 text-center mt-1">
+                Progreso: {ordenSorteo.filter(o => o.status === 'completado').length} de {ordenSorteo.length} sorteos
+                {posicionActual <= ordenSorteo.length && ` • Siguiente: #${posicionActual}`}
+              </p>
+            </div>
+          )}
 
           {/* TÓMBOLA / ANIMACIÓN PRINCIPAL */}
           <div className="relative">
@@ -620,13 +661,14 @@ const Sorteo = () => {
             </div>
           ) : (
             <div className="flex flex-wrap gap-2">
-              {participantsAvailable.map((p, idx) => {
+              {participantsAvailable.map((item, idx) => {
+                const p = item.participant;
                 const needed = p.drawCount ?? 1;
                 const have = (p.teamIds || []).length;
                 return (
                   <span key={p.email} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-500/20 text-xs font-semibold text-amber-700 dark:text-amber-300">
                     <span className="text-[8px] font-bold text-amber-500 dark:text-amber-400 bg-amber-100 dark:bg-amber-500/10 px-1 py-0.2 rounded min-w-[18px] text-center">
-                      #{idx + 1}
+                      #{item.posicion}
                     </span>
                     {p.photoType === "upload" && p.photo && p.photo !== '💼' && p.photo.startsWith('http') ? (
                       <img src={p.photo} alt="" className="w-4 h-4 rounded-full object-cover" />
