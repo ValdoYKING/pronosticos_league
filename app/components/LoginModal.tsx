@@ -1,32 +1,25 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Mail, KeyRound, LogIn, ArrowLeft, CheckCircle, Loader2, AlertCircle } from "lucide-react";
+import { User, KeyRound, LogIn, ArrowLeft, CheckCircle, Loader2, AlertCircle, Search } from "lucide-react";
 import useQuinielaStore from "../store/quiniela";
 import useLoginModalStore from "../store/loginModal";
 import { toast } from "sonner";
 
 // Componente global que mantiene su propio estado y NO depende de Register
 const LoginModalInner = ({ onClose }: { onClose: () => void }) => {
-  const { sendAccessCode, verifyAccessCode, loading } = useQuinielaStore();
-  const [email, setEmail] = useState("");
-  const [code, setCode] = useState(["", "", "", "", "", ""]);
-  const [step, setStep] = useState<"email" | "code">("email");
-  const [emailError, setEmailError] = useState("");
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const { participants, verifyAccessByName, loading } = useQuinielaStore();
+  const [name, setName] = useState("");
+  const [step, setStep] = useState<"name" | "verify">("name");
+  const [nameError, setNameError] = useState("");
   const [mounted, setMounted] = useState(false);
+  const [participantFound, setParticipantFound] = useState<any>(null);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  useEffect(() => {
-    if (step === "code") {
-      setTimeout(() => {
-        inputRefs.current[0]?.focus();
-      }, 100);
-    }
-  }, [step]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -38,82 +31,50 @@ const LoginModalInner = ({ onClose }: { onClose: () => void }) => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [loading]);
 
-  const handleSendCode = async (e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    setEmailError("");
+  // Búsqueda de participantes mientras escribe
+  useEffect(() => {
+    if (name.trim().length > 0) {
+      const filtered = participants.filter(p =>
+        p.name.toLowerCase().includes(name.trim().toLowerCase())
+      );
+      setSuggestions(filtered.slice(0, 5));
+      setShowSuggestions(filtered.length > 0 && step === "name");
+    } else {
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  }, [name, participants, step]);
 
-    if (!email.trim()) {
-      setEmailError("Ingresa tu correo electrónico");
+  const handleSearchParticipant = async () => {
+    setNameError("");
+
+    if (!name.trim()) {
+      setNameError("Ingresa el nombre con el que te registraste");
       return;
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setEmailError("Correo electrónico no válido");
+    // Buscar el participante por nombre
+    const found = participants.find(p => p.name.toLowerCase() === name.trim().toLowerCase());
+
+    if (!found) {
+      setNameError("No encontramos ese nombre en la quiniela. ¿Estás registrado?");
       return;
     }
 
-    try {
-      const exists = await sendAccessCode(email.trim().toLowerCase());
-      if (exists) {
-        setStep("code");
-      }
-    } catch (error) {
-      console.error("[LoginModal] Error inesperado al enviar código:", error);
-      toast.error("Ocurrió un error inesperado. Intenta de nuevo.");
-    }
-  };
+    setParticipantFound(found);
 
-  const handleCodeChange = (index: number, value: string) => {
-    if (value.length > 1) {
-      const digits = value.replace(/\D/g, "").split("").slice(0, 6);
-      const newCode = [...code];
-      digits.forEach((digit, i) => {
-        if (i < 6) newCode[i] = digit;
-      });
-      setCode(newCode);
-      const lastIndex = Math.min(digits.length, 5);
-      inputRefs.current[lastIndex]?.focus();
-      return;
-    }
-
-    if (value && !/^\d$/.test(value)) return;
-
-    const newCode = [...code];
-    newCode[index] = value;
-    setCode(newCode);
-
-    if (value && index < 5) {
-      inputRefs.current[index + 1]?.focus();
-    }
-  };
-
-  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
-    if (e.key === "Backspace" && !code[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
-    }
-    if (e.key === "Enter") {
-      handleVerifyCode();
-    }
-  };
-
-  const handleVerifyCode = async () => {
-    const fullCode = code.join("");
-    if (fullCode.length !== 6) {
-      toast.warning("Ingresa el código completo de 6 dígitos");
-      return;
-    }
-
-    const success = await verifyAccessCode(email.trim().toLowerCase(), fullCode);
+    // Acceso directo: verificar y cargar el participante
+    const success = await verifyAccessByName(found.email);
     if (success) {
-      toast.success("¡Acceso verificado! Bienvenido de vuelta.");
+      toast.success(`¡Bienvenido de vuelta, ${found.name}!`);
       onClose();
     }
   };
 
-  const handleReset = () => {
-    setStep("email");
-    setCode(["", "", "", "", "", ""]);
-    setEmailError("");
+  const handleSelectSuggestion = (p: any) => {
+    setName(p.name);
+    setShowSuggestions(false);
+    setParticipantFound(p);
   };
 
   if (!mounted) return null;
@@ -143,9 +104,7 @@ const LoginModalInner = ({ onClose }: { onClose: () => void }) => {
                   Acceso a tu Quiniela
                 </h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {step === "email"
-                    ? "Ingresa tu correo para recibir un código"
-                    : "Revisa tu bandeja de entrada"}
+                  Ingresa tu nombre para acceder
                 </p>
               </div>
             </div>
@@ -167,161 +126,112 @@ const LoginModalInner = ({ onClose }: { onClose: () => void }) => {
 
         {/* Body */}
         <div className="px-6 py-6 space-y-5">
-          {step === "email" ? (
+          {step === "name" ? (
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">
-                  Correo Electrónico Registrado
+                  Tu Nombre o Alias
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
-                    type="email"
-                    value={email}
+                    type="text"
+                    value={name}
                     onChange={(e) => {
-                      setEmail(e.target.value);
-                      setEmailError("");
+                      setName(e.target.value);
+                      setNameError("");
                     }}
-                    placeholder="ej. correo@oficina.com"
+                    onFocus={() => {
+                      if (suggestions.length > 0) setShowSuggestions(true);
+                    }}
+                    onBlur={() => {
+                      setTimeout(() => setShowSuggestions(false), 200);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleSearchParticipant();
+                    }}
+                    placeholder="Ej. El Licenciado Martínez"
                     className={`w-full bg-white dark:bg-gray-950/60 border ${
-                      emailError ? "border-red-400 dark:border-red-500" : "border-gray-300 dark:border-gray-800"
+                      nameError ? "border-red-400 dark:border-red-500" : "border-gray-300 dark:border-gray-800"
                     } focus:border-emerald-500 dark:focus:border-emerald-500 focus:outline-none rounded-xl pl-10 pr-4 py-3 text-sm transition text-gray-900 dark:text-gray-100`}
                   />
+
+                  {/* Sugerencias de autocompletado */}
+                  {showSuggestions && suggestions.length > 0 && (
+                    <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl overflow-hidden">
+                      {suggestions.map(p => (
+                        <button
+                          key={p.email}
+                          type="button"
+                          onMouseDown={() => handleSelectSuggestion(p)}
+                          className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-left hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition border-b border-gray-100 dark:border-gray-800 last:border-0"
+                        >
+                          {p.photoType === 'upload' && p.photo && p.photo !== '💼' && p.photo.startsWith('http') ? (
+                            <img src={p.photo} alt="" className="w-6 h-6 rounded-full object-cover" />
+                          ) : (
+                            <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-500/10 flex items-center justify-center text-sm">
+                              {p.photo && p.photo.length <= 2 ? p.photo : '💼'}
+                            </div>
+                          )}
+                          <div className="flex-1">
+                            <p className="font-semibold text-gray-900 dark:text-gray-100">{p.name}</p>
+                            <p className="text-[9px] text-gray-400">
+                              {(p.teamIds || []).map((tid: string) => {
+                                const team = participants[0] ? null : null; // placeholder
+                                return null;
+                              }).filter(Boolean).join(', ') || 'Participante'}
+                            </p>
+                          </div>
+                          <LogIn className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                {emailError && (
+                {nameError && (
                   <p className="text-[10px] text-red-500 dark:text-red-400 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" /> {emailError}
+                    <AlertCircle className="w-3 h-3" /> {nameError}
                   </p>
                 )}
                 <p className="text-[10px] text-gray-400 dark:text-gray-500">
-                  Debe ser el mismo correo que usaste al registrarte.
+                  Debe ser el mismo nombre o alias que usaste al registrarte.
                 </p>
                 <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/30">
                   <p className="text-[10px] text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
-                    <span className="text-xs">📧</span>
-                    <span>Recibirás un correo electrónico con tu código de acceso de 6 dígitos.</span>
+                    <User className="w-3.5 h-3.5" />
+                    <span>Busca tu nombre y accede directamente a tu quiniela.</span>
                   </p>
                 </div>
               </div>
 
               <button
                 type="button"
-                onClick={(e) => handleSendCode(e)}
+                onClick={handleSearchParticipant}
                 disabled={loading}
                 className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:from-emerald-600 hover:to-teal-700 font-bold shadow-lg shadow-emerald-500/20 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Enviando código...
+                    Buscando...
                   </>
                 ) : (
                   <>
-                    <KeyRound className="w-4 h-4" />
-                    Enviar Código de Acceso
+                    <Search className="w-4 h-4" />
+                    Buscar y Acceder
                   </>
                 )}
               </button>
             </div>
           ) : (
-            <div className="space-y-5">
-              <div className="text-center space-y-2">
-                <div className="w-14 h-14 mx-auto rounded-full bg-emerald-100 dark:bg-emerald-500/10 flex items-center justify-center">
-                  <Mail className="w-7 h-7 text-emerald-600 dark:text-emerald-400" />
-                </div>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  Hemos enviado un código de <strong>6 dígitos</strong> a:
-                </p>
-                <p className="font-bold text-base text-emerald-600 dark:text-emerald-400">
-                  {email}
-                </p>
-                <p className="text-[10px] text-gray-400 dark:text-gray-500">
-                  Si no ves el correo, revisa tu bandeja de spam.
-                </p>
-              </div>
-
-              <div className="flex justify-center gap-2">
-                {code.map((digit, index) => (
-                  <input
-                    key={index}
-                    ref={(el) => {
-                      inputRefs.current[index] = el;
-                    }}
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={1}
-                    value={digit}
-                    onChange={(e) => handleCodeChange(index, e.target.value)}
-                    onKeyDown={(e) => handleKeyDown(index, e)}
-                    className={`w-11 h-12 sm:w-12 sm:h-14 text-center text-xl font-extrabold bg-white dark:bg-gray-950/60 border-2 rounded-xl transition-all ${
-                      digit
-                        ? "border-emerald-500 dark:border-emerald-500 shadow-md shadow-emerald-500/10"
-                        : "border-gray-300 dark:border-gray-700"
-                    } focus:border-emerald-500 dark:focus:border-emerald-500 focus:outline-none text-gray-900 dark:text-gray-100`}
-                  />
-                ))}
-              </div>
-
-              <div className="space-y-3">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleVerifyCode();
-                  }}
-                  disabled={loading || code.join("").length !== 6}
-                  className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:from-emerald-600 hover:to-teal-700 font-bold shadow-lg shadow-emerald-500/20 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Verificando código...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="w-4 h-4" />
-                      Verificar Código y Acceder
-                    </>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleReset();
-                  }}
-                  className="w-full py-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 font-semibold transition flex items-center justify-center gap-2 text-sm border border-gray-200 dark:border-gray-700"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  Cambiar correo
-                </button>
-
-                <div className="text-center">
-                  <button
-                    type="button"
-                    disabled={loading}
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      setCode(["", "", "", "", "", ""]);
-                      try {
-                        await sendAccessCode(email);
-                      } catch (error) {
-                        console.error("[LoginModal] Error al reenviar código:", error);
-                      }
-                    }}
-                    className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {loading ? "Reenviando..." : "¿No recibiste el código? Reenviar"}
-                  </button>
-                </div>
-              </div>
-            </div>
+            /* Este step ya no se usa, pero se mantiene por compatibilidad */
+            null
           )}
         </div>
 
         <div className="px-6 py-4 bg-gray-50 dark:bg-gray-950/50 border-t border-gray-200 dark:border-gray-800">
           <p className="text-[10px] text-gray-400 dark:text-gray-500 text-center">
-            Este acceso es para participantes ya registrados. Si aún no te has registrado, vuelve a la pestaña &quot;Registrarme&quot;.
+            Si no encuentras tu nombre, contacta al administrador para registrarte.
           </p>
         </div>
       </div>
@@ -339,3 +249,4 @@ const LoginModal = () => {
 };
 
 export default LoginModal;
+
