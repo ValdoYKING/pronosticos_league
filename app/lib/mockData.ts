@@ -26,6 +26,19 @@ export interface Participant {
   status: 'activo' | 'eliminado';
   drawCount?: number; // Cantidad de sorteos (veces que saldrá en la tómbola). Default: 1
   ordenPronostico?: number; // Orden de registro para el sorteo (auto-incremental). A menor número, primero en sortearse
+  ordenesSorteo?: number[]; // Array de órdenes específicos de sorteo para este participante. Ej: [1, 2, 44]
+}
+
+// ============================================================
+// ORDEN_SORTEO - Controla el orden de los 48 sorteos
+// Cada fila = una posición (1-48) con el participante que pasa en ese turno
+// ============================================================
+export interface OrdenSorteo {
+  id: number;
+  posicion: number;
+  participantEmail: string | null;
+  participantName: string | null;
+  status: 'pendiente' | 'completado' | 'saltado';
 }
 
 export interface Match {
