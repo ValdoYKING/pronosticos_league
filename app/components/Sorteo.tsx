@@ -152,13 +152,15 @@ const Sorteo = () => {
     const winner = winnerData.participant;
     setSelectedWinner(winner);
     setDisplayName(winner.name);
+    setSpinPhase("shuffling");
+    setIsSpinning(true);
 
     // ============================================================
-    // FASE 1: Animación de "papelitos" mezclándose (~2 segundos)
+    // FASE 1: Animación de "papelitos" mezclándose (~1.5 segundos)
     // Muestra el nombre del siguiente en orden
     // ============================================================
     let shuffleCount = 0;
-    const totalShuffles = 20;
+    const totalShuffles = 15;
 
     shuffleRef.current = setInterval(() => {
       shuffleCount++;
@@ -661,12 +663,12 @@ const Sorteo = () => {
             </div>
           ) : (
             <div className="flex flex-wrap gap-2">
-              {participantsAvailable.map((item, idx) => {
+              {participantsAvailable.map((item) => {
                 const p = item.participant;
                 const needed = p.drawCount ?? 1;
                 const have = (p.teamIds || []).length;
                 return (
-                  <span key={p.email} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-500/20 text-xs font-semibold text-amber-700 dark:text-amber-300">
+                  <span key={`pos-${item.posicion}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-500/20 text-xs font-semibold text-amber-700 dark:text-amber-300">
                     <span className="text-[8px] font-bold text-amber-500 dark:text-amber-400 bg-amber-100 dark:bg-amber-500/10 px-1 py-0.2 rounded min-w-[18px] text-center">
                       #{item.posicion}
                     </span>
