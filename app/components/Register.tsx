@@ -1,97 +1,97 @@
 /* eslint-disable @next/next/no-img-element */
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import useQuinielaStore from "../store/quiniela";
-import useLoginModalStore from "../store/loginModal";
-import { UserPlus, Mail, User, Camera, CheckCircle2, X, LogIn } from "lucide-react";
+import {
+  UserPlus,
+  User,
+  Camera,
+  ShieldAlert,
+  CheckCircle2,
+} from "lucide-react";
 import { toast } from "sonner";
-import { GROUP_LABELS } from "../lib/mockData";
-// Nueva función para enviar el correo
-const sendWelcomeEmail = async (to: string, userName: string) => {
-  try {
-    const response = await fetch('/api/send-email', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        to,
-        userName,
-        subject: '¡Bienvenido a la Quiniela de la Oficina!',
-      }),
-    });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Algo salió mal al enviar el correo');
-    }
-
-    console.log('Correo de bienvenida enviado exitosamente!');
-  } catch (error) {
-    console.error('Error al enviar el correo de bienvenida:', error);
-    // Mostrar el error al usuario para que pueda diagnosticar qué falla
-    const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
-    toast.error(`No se pudo enviar el correo de bienvenida: ${errorMsg}`);
-  }
-};
+const ADMIN_EMAILS = [
+  "osvaldovm2002@gmail.com",
+  "osvaldovillalba-02@hotmail.com",
+];
 
 const Register = () => {
-  const { myRegistration, deleteMyRegistration, registerUser, teams, participants } =
-    useQuinielaStore();
+  const {
+    myRegistration,
+    deleteMyRegistration,
+    registerUserWithoutTeams,
+    participants,
+    teams,
+  } = useQuinielaStore();
   const [regName, setRegName] = useState("");
-  const [regEmail, setRegEmail] = useState("");
-  const [regPhotoType, setRegPhotoType] = useState<"avatar" | "upload">("avatar");
+  const [regDrawCount, setRegDrawCount] = useState(1);
+  const [regPhotoType, setRegPhotoType] = useState<"avatar" | "flag">("avatar");
   const [regAvatar, setRegAvatar] = useState("💼");
-  const [regPhotoBase64, setRegPhotoBase64] = useState("");
-  const [regTeamIds, setRegTeamIds] = useState<string[]>([]);
+  const [regFlagAvatar, setRegFlagAvatar] = useState("");
   const [uploading, setUploading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const { open: openLoginModal } = useLoginModalStore();
-
-  // Detectar si el correo ingresado ya está registrado (para mostrar botón de acceso)
-  const emailAlreadyRegistered = useMemo(() => {
-    if (!regEmail.trim()) return null;
-    const found = participants.find(
-      (p) =>
-        p.email.toLowerCase() === regEmail.trim().toLowerCase() &&
-        p.email !== myRegistration?.email
-    );
-    return found || null;
-  }, [regEmail, participants, myRegistration]);
 
   // Estados para errores de validación en tiempo real
   const [nameError, setNameError] = useState("");
-  const [emailError, setEmailError] = useState("");
 
   const avatares = [
-    "💼", "☕", "💻", "📊", "📁", "📈",
-    "🍩", "🥑", "🦖", "🦄", "🐱", "🍕",
-    "🎮", "🎯", "🎲", "🧠", "👨‍💻", "👩‍💼",
+    "🇦🇷", // Argentina
+    "🇦🇺", // Australia
+    "🇦🇹", // Austria
+    "🇧🇪", // Bélgica
+    "🇧🇷", // Brasil
+    "🇨🇦", // Canadá
+    "🇨🇱", // Chile
+    "🇨🇴", // Colombia
+    "🇨🇷", // Costa Rica
+    "🇨🇭", // Suiza
+    "🇩🇰", // Dinamarca
+    "🇪🇨", // Ecuador
+    "🇪🇬", // Egipto
+    "🇪🇸", // España
+    "🇺🇸", // Estados Unidos
+    "🇫🇷", // Francia
+    "🇩🇪", // Alemania
+    "🇬🇭", // Ghana
+    "🇬🇷", // Grecia
+    "🇭🇳", // Honduras
+    "🇮🇹", // Italia
+    "🇯🇵", // Japón
+    "🇰🇷", // Corea del Sur
+    "🇲🇽", // México
+    "🇳🇱", // Países Bajos
+    "🇳🇬", // Nigeria
+    "🇵🇦", // Panamá
+    "🇵🇪", // Perú
+    "🇵🇹", // Portugal
+    "🇶🇦", // Qatar
+    "🇷🇺", // Rusia
+    "🇸🇦", // Arabia Saudita
+    "🇸🇳", // Senegal
+    "🇷🇸", // Serbia
+    "🇸🇪", // Suecia
+    "🇹🇳", // Túnez
+    "🇹🇷", // Turquía
+    "🇺🇾", // Uruguay
+    "🇻🇪", // Venezuela
+    "🇲🇦", // Marruecos
+    "🇨🇿", // República Checa
+    "🇵🇱", // Polonia
+    "🇨🇲", // Camerún
+    "🇭🇷", // Croacia
+    "🇮🇳", // India
+    "🇨🇳", // China
+    "🇿🇦", // Sudáfrica
   ];
 
-  // Agrupar equipos por grupo
-  const groupedTeams = useMemo(() => {
-    const groups: Record<string, typeof teams> = {};
-    const groupOrder = ["A","B","C","D","E","F","G","H","I","J","K","L"];
-    for (const g of groupOrder) {
-      groups[g] = teams.filter(t => t.group === g);
-    }
-    return groups;
-    //670063 
-  }, [teams]);
-
-  // Contar representantes por equipo
-  const getParticipantCount = (teamId: string) => {
-    return participants.filter(p => p.teamIds?.includes(teamId)).length;
-  };
-
-  // Validar nombre único (excluyendo mi propio registro si ya existe)
+  // Validar nombre único
   const validateName = (value: string) => {
     if (!value.trim()) {
       setNameError("");
       return true;
     }
     const exists = participants.some(
-      p => p.name.toLowerCase() === value.trim().toLowerCase() && p.email !== myRegistration?.email
+      (p) => p.name.toLowerCase() === value.trim().toLowerCase(),
     );
     if (exists) {
       setNameError("Este nombre o alias ya está registrado por otra persona.");
@@ -101,44 +101,11 @@ const Register = () => {
     return true;
   };
 
-  // Validar email único (excluyendo mi propio registro si ya existe)
-  const validateEmail = (value: string) => {
-    if (!value.trim()) {
-      setEmailError("");
-      return true;
-    }
-    const exists = participants.some(
-      p => p.email.toLowerCase() === value.trim().toLowerCase() && p.email !== myRegistration?.email
-    );
-    if (exists) {
-      setEmailError("Este correo ya está registrado por otro participante.");
-      return false;
-    }
-    setEmailError("");
-    return true;
-  };
-
-  const handlePhotoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        toast.warning("La imagen es muy grande. Máximo 2MB.");
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setRegPhotoBase64(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validar nombre
     if (!regName.trim()) {
-      toast.warning("Por favor, ingresa tu nombre o alias.");
+      toast.warning("Por favor, ingresa el nombre o alias del participante.");
       return;
     }
     if (!validateName(regName)) {
@@ -146,81 +113,390 @@ const Register = () => {
       return;
     }
 
-    // Validar email
-    if (!regEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(regEmail)) {
-      toast.warning("Por favor, ingresa un correo electrónico válido.");
-      return;
-    }
-    if (!validateEmail(regEmail)) {
-      toast.error("Ese correo ya está registrado. Si es tuyo, revisa tus datos.");
-      return;
-    }
-
-    // Validar que haya al menos un equipo seleccionado
-    if (regTeamIds.length === 0) {
-      toast.warning("Por favor, selecciona al menos un equipo.");
-      return;
-    }
-
     setUploading(true);
-    const photo = regPhotoType === "avatar" ? regAvatar : regPhotoBase64;
-    
-    try {
-      await registerUser(regName, regEmail, regTeamIds, regPhotoType, photo);
-      
-      // Enviar correo después del registro exitoso
-      await sendWelcomeEmail(regEmail, regName);
 
+    let finalPhotoType: "avatar" | "upload" = "avatar";
+    let finalPhoto = regAvatar;
+
+    if (regPhotoType === "flag" && regFlagAvatar) {
+      finalPhotoType = "upload";
+      finalPhoto = regFlagAvatar;
+    }
+
+    const emailBase = regName
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "_");
+    const generatedEmail = `${emailBase}@quiniela.internal`;
+
+    try {
+      await registerUserWithoutTeams(
+        regName,
+        generatedEmail,
+        finalPhotoType,
+        finalPhoto,
+        regDrawCount,
+      );
+
+      setRegName("");
+      setRegAvatar("💼");
+      setRegFlagAvatar("");
+      setRegPhotoType("avatar");
+      setRegDrawCount(1);
+      toast.success(
+        `¡${regName} ha sido registrado! Le tocarán ${regDrawCount} equipo(s) en el Sorteo.`,
+      );
     } catch (error) {
-      // El error ya se maneja dentro de registerUser, pero por si acaso
       console.error("Error en el proceso de registro:", error);
     } finally {
       setUploading(false);
     }
   };
 
-  // Si ya tiene registro, mostrar el resumen actualizado
-  if (myRegistration) {
-    const myTeams = (myRegistration.teamIds || [])
-      .map(tid => teams.find(t => t.id === tid))
-      .filter(Boolean);
-    return (
-      <div className="space-y-6">
-          <div className="max-w-3xl mx-auto">
-            <div className="glass rounded-2xl p-6 sm:p-8 space-y-6 border border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-transparent">
+  return (
+    <div className="space-y-6">
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* ============================================ */}
+        {/* FORMULARIO DE REGISTRO (siempre visible) */}
+        {/* ============================================ */}
+        <div className="glass rounded-2xl p-6 sm:p-8 space-y-8 border border-amber-200 dark:border-amber-500/20 bg-white/50 dark:bg-transparent">
+          <div className="text-center space-y-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 text-xs font-semibold mb-2 border border-amber-200 dark:border-amber-500/20">
+              <ShieldAlert className="w-3.5 h-3.5" />
+              Solo Administrador
+            </div>
+            <h2 className="text-2xl font-extrabold text-gray-900 dark:text-white">
+              Registro de Nuevo Participante
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Crea un nuevo participante. Después, ve al <strong>Sorteo</strong>{" "}
+              para asignarle su(s) equipo(s).
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-8">
+            {/* SECCIÓN 1: DATOS DEL PARTICIPANTE */}
+            <div className="space-y-5">
+              <h3 className="text-sm font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-2 border-b border-gray-200 dark:border-gray-800 pb-2">
+                <User className="w-4 h-4" /> Datos del Participante
+              </h3>
+
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">
+                    Nombre o Alias
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      value={regName}
+                      onChange={(e) => {
+                        setRegName(e.target.value);
+                        validateName(e.target.value);
+                      }}
+                      className={`w-full bg-white dark:bg-gray-950/60 border ${
+                        nameError
+                          ? "border-red-400 dark:border-red-500"
+                          : "border-gray-300 dark:border-gray-800"
+                      } focus:border-emerald-500 dark:focus:border-emerald-500 focus:outline-none rounded-xl pl-10 pr-4 py-3 text-sm transition text-gray-900 dark:text-gray-100`}
+                      placeholder="Ej. El Licenciado Martínez"
+                    />
+                    {                    nameError && (
+                      <p className="text-[10px] text-red-500 dark:text-red-400 mt-1">
+                        {nameError}
+                      </p>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-gray-400 dark:text-gray-500">
+                    Nombre único que identificará al participante en la
+                    quiniela.
+                  </p>
+                </div>
+
+                {/* CAMPO: Cantidad de Sorteos */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">
+                    Cantidad de Sorteos
+                  </label>
+                  <div className="relative">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setRegDrawCount(Math.max(1, regDrawCount - 1))}
+                        className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition font-bold text-lg"
+                      >
+                        −
+                      </button>
+                      <input
+                        type="number"
+                        min="1"
+                        max="48"
+                        value={regDrawCount}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10);
+                          if (!isNaN(val) && val >= 1 && val <= 48) {
+                            setRegDrawCount(val);
+                          }
+                        }}
+                        className="w-20 text-center bg-white dark:bg-gray-950/60 border border-gray-300 dark:border-gray-800 focus:border-emerald-500 dark:focus:border-emerald-500 focus:outline-none rounded-xl py-3 text-sm font-bold text-gray-900 dark:text-gray-100 transition"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setRegDrawCount(Math.min(48, regDrawCount + 1))}
+                        className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition font-bold text-lg"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-gray-400 dark:text-gray-500">
+                    Número de equipos que recibirá este participante en el sorteo.
+                    {regDrawCount > 1 ? ` (será sorteado ${regDrawCount} veces)` : ' (será sorteado 1 vez)'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* SECCIÓN 2: AVATAR */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-2 border-b border-gray-200 dark:border-gray-800 pb-2">
+                <Camera className="w-4 h-4" /> Avatar del Participante
+              </h3>
+
+              <div className="flex gap-4">
+                <label className="inline-flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={regPhotoType === "avatar"}
+                    onChange={() => setRegPhotoType("avatar")}
+                    className="text-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-950 border-gray-300 dark:border-gray-800"
+                  />
+                  <span>Avatar Divertido</span>
+                </label>
+                <label className="inline-flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={regPhotoType === "flag"}
+                    onChange={() => setRegPhotoType("flag")}
+                    className="text-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-950 border-gray-300 dark:border-gray-800"
+                  />
+                  <span>Bandera de País</span>
+                </label>
+              </div>
+
+              {regPhotoType === "avatar" && (
+                <div className="flex flex-wrap gap-2 p-3 bg-gray-50 dark:bg-gray-950/40 rounded-xl border border-gray-200 dark:border-gray-800/80">
+                  {avatares.map((av) => (
+                    <button
+                      key={av}
+                      type="button"
+                      onClick={() => setRegAvatar(av)}
+                      className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl transition ${
+                        regAvatar === av
+                          ? "bg-emerald-100 dark:bg-emerald-500/20 border border-emerald-500 shadow-md scale-110"
+                          : "bg-white dark:bg-gray-800/40 border border-gray-200 dark:border-transparent hover:bg-gray-100 dark:hover:bg-gray-800"
+                      }`}
+                    >
+                      <span>{av}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {regPhotoType === "flag" && (
+                <div className="space-y-3 p-4 bg-gray-50 dark:bg-gray-950/40 rounded-xl border border-gray-200 dark:border-gray-800/80">
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                    Selecciona la bandera del país que servirá como avatar del
+                    participante:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {teams.map((team) => (
+                      <button
+                        key={team.id}
+                        type="button"
+                        onClick={() => setRegFlagAvatar(team.flagUrl)}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition border ${
+                          regFlagAvatar === team.flagUrl
+                            ? "bg-emerald-100 dark:bg-emerald-500/20 border-emerald-500 shadow-md scale-105 text-emerald-700 dark:text-emerald-300"
+                            : "bg-white dark:bg-gray-800/40 border-gray-200 dark:border-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
+                        }`}
+                      >
+                        <img
+                          src={team.flagUrl}
+                          alt={team.name}
+                          className="w-5 h-3.5 object-cover rounded"
+                        />
+                        <span>{team.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {regFlagAvatar && (
+                    <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
+                      <span>✓ Avatar seleccionado:</span>
+                      <img
+                        src={regFlagAvatar}
+                        alt="Flag avatar"
+                        className="w-6 h-4 object-cover rounded border border-emerald-400"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* BOTÓN DE REGISTRO */}
+            <div className="pt-4">
+              <button
+                type="submit"
+                disabled={uploading}
+                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:from-emerald-600 hover:to-teal-700 dark:text-white font-extrabold shadow-xl shadow-emerald-500/10 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {uploading ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                    Registrando...
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="w-5 h-5" /> Registrar Nuevo
+                    Participante
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {/* ============================================ */}
+        {/* LISTA DE PARTICIPANTES YA REGISTRADOS */}
+        {/* ============================================ */}
+        <div className="glass rounded-2xl p-6 sm:p-8 space-y-6 border border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-transparent">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                Participantes Registrados
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Total: {participants.length} participantes —{" "}
+                {
+                  participants.filter(
+                    (p) => !p.teamIds || p.teamIds.length === 0,
+                  ).length
+                }{" "}
+                sin equipo
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {participants.length === 0 ? (
+              <div className="col-span-full text-center py-6">
+                <p className="text-sm text-gray-400 dark:text-gray-500 italic">
+                  Aún no hay participantes registrados. ¡Usa el formulario de
+                  arriba para agregar el primero!
+                </p>
+              </div>
+            ) : (
+              participants.map((p) => {
+                const teamNames = (p.teamIds || [])
+                  .map((tid) => teams.find((t) => t.id === tid))
+                  .filter(Boolean);
+                return (
+                  <div
+                    key={p.email}
+                    className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-950/40 border border-gray-200 dark:border-gray-800 transition hover:border-emerald-300 dark:hover:border-emerald-700/30"
+                  >
+                    {/* Avatar */}
+                    {p.photoType === "upload" &&
+                    p.photo &&
+                    p.photo !== "💼" &&
+                    p.photo.startsWith("http") ? (
+                      <img
+                        src={p.photo}
+                        alt=""
+                        className="w-10 h-10 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-500/10 border-2 border-gray-200 dark:border-gray-700 flex items-center justify-center text-lg">
+                        {p.photo && p.photo.length <= 2 ? p.photo : "💼"}
+                      </div>
+                    )}
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-gray-900 dark:text-gray-100 truncate">
+                        {p.name}
+                      </p>
+                      <div className="flex flex-wrap gap-1 mt-0.5">
+                        {teamNames.length > 0 ? (
+                          teamNames.map((t: any) => (
+                            <span
+                              key={t.id}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-500/5 text-[9px] font-semibold text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/10"
+                            >
+                              <img
+                                src={t.flagUrl}
+                                alt=""
+                                className="w-3 h-2 object-cover rounded"
+                              />
+                              {t.name}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[9px] text-gray-400 dark:text-gray-500 italic">
+                            Sin equipo
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {/* Badge estado */}
+                    <span
+                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap ${
+                        p.status === "activo"
+                          ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20"
+                          : "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-500/20"
+                      }`}
+                    >
+                      {p.status === "activo" ? "Vivo" : "Eliminado"}
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* ============================================ */}
+        {/* MI REGISTRO (si el admin también es participante) */}
+        {/* ============================================ */}
+        {myRegistration && (
+          <div className="glass rounded-2xl p-6 sm:p-8 space-y-6 border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50/30 dark:bg-emerald-950/20">
             <div className="text-center space-y-2">
-              <h2 className="text-2xl font-extrabold text-gray-900 dark:text-white">
-                ¡Ya estás registrado! 🎉
+              <h2 className="text-xl font-extrabold text-emerald-700 dark:text-emerald-400">
+                🎯 Tu Registro Personal
               </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Tus datos ya están en la quiniela. Aquí tienes tu resumen:
+              <p className="text-xs text-gray-600 dark:text-gray-400">
+                Este es tu registro en la quiniela como participante.
               </p>
             </div>
 
-            <div className="p-5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-500/30 flex flex-col sm:flex-row items-center gap-4">
+            <div className="p-5 rounded-xl bg-white dark:bg-gray-950/40 border border-emerald-200 dark:border-emerald-500/30 flex flex-col sm:flex-row items-center gap-4">
               <div className="flex-shrink-0">
-                {myRegistration.photoType === "upload" && myRegistration.photo && myRegistration.photo !== '💼' && myRegistration.photo.startsWith('http') ? (
+                {myRegistration.photoType === "upload" &&
+                myRegistration.photo &&
+                myRegistration.photo !== "💼" &&
+                myRegistration.photo.startsWith("https") ? (
                   <img
-                    key={myRegistration.photo}
                     src={myRegistration.photo}
                     alt="User"
                     className="w-16 h-16 rounded-full object-cover border-2 border-emerald-300 dark:border-emerald-500/40"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      console.warn('[Avatar Error] No se pudo cargar:', target.src);
-                      target.style.display = 'none';
-                      const parent = target.parentElement;
-                      if (parent) {
-                        const fallback = document.createElement('div');
-                        fallback.className = 'w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-500/20 border-2 border-emerald-300 dark:border-emerald-500/40 flex items-center justify-center text-3xl';
-                        fallback.textContent = myRegistration!.photoType === 'avatar' && myRegistration!.photo && myRegistration!.photo.length <= 2 ? myRegistration!.photo : '💼';
-                        parent.appendChild(fallback);
-                      }
-                    }}
                   />
                 ) : (
                   <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-500/20 border-2 border-emerald-300 dark:border-emerald-500/40 flex items-center justify-center text-3xl">
-                    {myRegistration.photo && myRegistration.photo.length <= 2 ? myRegistration.photo : "💼"}
+                    {myRegistration.photo && myRegistration.photo.length <= 2
+                      ? myRegistration.photo
+                      : "💼"}
                   </div>
                 )}
               </div>
@@ -228,23 +504,43 @@ const Register = () => {
                 <p className="text-lg font-extrabold text-gray-900 dark:text-white">
                   {myRegistration.name}
                 </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1.5 justify-center sm:justify-start">
-                  <Mail className="w-3.5 h-3.5" /> {myRegistration.email}
-                </p>
                 <div className="flex flex-wrap gap-1.5 justify-center sm:justify-start">
-                  {myTeams.map((t: any) => (
-                    <span key={t.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 text-xs font-semibold border border-amber-200 dark:border-amber-500/20">
-                      {t.flag} {t.name}
-                      <span className="text-[9px] text-gray-500 dark:text-gray-400 ml-0.5">(Grupo {t.group})</span>
+                  {(myRegistration.teamIds || []).map((tid) => {
+                    const t = teams.find((team) => team.id === tid);
+                    return t ? (
+                      <span
+                        key={t.id}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 text-xs font-semibold border border-amber-200 dark:border-amber-500/20"
+                      >
+                        <img
+                          src={t.flagUrl}
+                          alt=""
+                          className="w-4 h-3 object-cover rounded"
+                        />
+                        {t.name}
+                        <span className="text-[9px] text-gray-500 dark:text-gray-400 ml-0.5">
+                          (Grupo {t.group})
+                        </span>
+                      </span>
+                    ) : null;
+                  })}
+                  {(!myRegistration.teamIds ||
+                    myRegistration.teamIds.length === 0) && (
+                    <span className="text-xs text-gray-400 dark:text-gray-500 italic">
+                      Sin equipo asignado aún
                     </span>
-                  ))}
+                  )}
                 </div>
-                <span className={`inline-block text-xs font-bold px-2 py-0.5 rounded-full ${
-                  myRegistration.status === "activo"
-                    ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20"
-                    : "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-500/20"
-                }`}>
-                  {myRegistration.status === "activo" ? "✅ Sigues vivo en el torneo" : "❌ Eliminado del torneo"}
+                <span
+                  className={`inline-block text-xs font-bold px-2 py-0.5 rounded-full ${
+                    myRegistration.status === "activo"
+                      ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20"
+                      : "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-500/20"
+                  }`}
+                >
+                  {myRegistration.status === "activo"
+                    ? "✅ Sigues vivo en el torneo"
+                    : "❌ Eliminado del torneo"}
                 </span>
               </div>
             </div>
@@ -283,311 +579,7 @@ const Register = () => {
               )}
             </div>
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="max-w-5xl mx-auto">
-        <div className="glass rounded-2xl p-6 sm:p-8 space-y-8 border border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-transparent">
-          <div className="text-center space-y-2">
-            <h2 className="text-2xl font-extrabold text-gray-900 dark:text-white">
-              Registro de Selección de Equipo
-            </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Llena tus datos, selecciona la selección que vas a representar y
-              ¡que gane el mejor!
-            </p>
-          </div>
-
-          {/* Botón de acceso siempre visible */}
-          <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/30 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-sm text-amber-800 dark:text-amber-300">
-              <LogIn className="w-5 h-5 flex-shrink-0" />
-              <span>¿Ya te registraste anteriormente? Recupera tu acceso aquí</span>
-            </div>
-            <button
-              type="button"
-              onClick={openLoginModal}
-              className="px-5 py-2 rounded-xl bg-amber-500 text-white hover:bg-amber-600 dark:hover:bg-amber-400 font-bold text-sm transition flex items-center gap-2 shadow-md shadow-amber-500/20 whitespace-nowrap"
-            >
-              <LogIn className="w-4 h-4" /> Ingresa a tu quiniela
-            </button>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-8">
-            {/* ===== SECCIÓN 1: DATOS PERSONALES ===== */}
-            <div className="space-y-5">
-              <h3 className="text-sm font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-2 border-b border-gray-200 dark:border-gray-800 pb-2">
-                <User className="w-4 h-4" /> Tus Datos
-              </h3>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Nombre */}
-                <div className="space-y-2">
-                  <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">
-                    Nombre o Alias
-                  </label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type="text"
-                      value={regName}
-                      onChange={(e) => {
-                        setRegName(e.target.value);
-                        validateName(e.target.value);
-                      }}
-                      className={`w-full bg-white dark:bg-gray-950/60 border ${
-                        nameError ? 'border-red-400 dark:border-red-500' : 'border-gray-300 dark:border-gray-800'
-                      } focus:border-emerald-500 dark:focus:border-emerald-500 focus:outline-none rounded-xl pl-10 pr-4 py-3 text-sm transition text-gray-900 dark:text-gray-100`}
-                      placeholder="Ej. El Licenciado Martínez"
-                    />
-                    {nameError && (
-                      <p className="text-[10px] text-red-500 dark:text-red-400 mt-1">{nameError}</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Correo Electrónico */}
-                <div className="space-y-2">
-                  <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-widest">
-                    Correo Electrónico
-                  </label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type="email"
-                      value={regEmail}
-                      onChange={(e) => {
-                        setRegEmail(e.target.value);
-                        validateEmail(e.target.value);
-                      }}
-                      className={`w-full bg-white dark:bg-gray-950/60 border ${
-                        emailError ? 'border-red-400 dark:border-red-500' : 'border-gray-300 dark:border-gray-800'
-                      } focus:border-emerald-500 dark:focus:border-emerald-500 focus:outline-none rounded-xl pl-10 pr-4 py-3 text-sm transition text-gray-900 dark:text-gray-100`}
-                      placeholder="ej. correo@oficina.com"
-                    />
-                    {emailError && (
-                      <p className="text-[10px] text-red-500 dark:text-red-400 mt-1">{emailError}</p>
-                    )}
-                  </div>
-                  <p className="text-[10px] text-gray-400 dark:text-gray-500">
-                    Necesario para identificar tu registro.
-                  </p>
-
-                  {/* Botón de acceso para correo ya registrado */}
-                  {emailAlreadyRegistered && (
-                    <div className="mt-3 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-500/30">
-                      <p className="text-xs text-emerald-700 dark:text-emerald-300 font-semibold mb-2">
-                        ✨ Este correo ya está registrado por <strong>{emailAlreadyRegistered.name}</strong>
-                      </p>
-                      <button
-                        type="button"
-                        onClick={openLoginModal}
-                        className="w-full py-2.5 rounded-xl bg-emerald-500 text-white hover:bg-emerald-600 dark:hover:bg-emerald-400 font-bold text-sm transition flex items-center justify-center gap-2 shadow-md shadow-emerald-500/20"
-                      >
-                        <LogIn className="w-4 h-4" /> Ya seleccionaste equipo, ingresa aquí
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* ===== SECCIÓN 2: FOTO / AVATAR ===== */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-2 border-b border-gray-200 dark:border-gray-800 pb-2">
-                <Camera className="w-4 h-4" /> Foto de Representante (Opcional)
-              </h3>
-
-              <div className="flex gap-4">
-                <label className="inline-flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                  <input
-                    type="radio"
-                    checked={regPhotoType === "avatar"}
-                    onChange={() => setRegPhotoType("avatar")}
-                    className="text-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-950 border-gray-300 dark:border-gray-800"
-                  />
-                  <span>Elegir Avatar Divertido</span>
-                </label>
-                <label className="inline-flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                  <input
-                    type="radio"
-                    checked={regPhotoType === "upload"}
-                    onChange={() => setRegPhotoType("upload")}
-                    className="text-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-950 border-gray-300 dark:border-gray-800"
-                  />
-                  <span>Subir mi propia Foto</span>
-                </label>
-              </div>
-
-              {regPhotoType === "avatar" && (
-                <div className="flex flex-wrap gap-2 p-3 bg-gray-50 dark:bg-gray-950/40 rounded-xl border border-gray-200 dark:border-gray-800/80">
-                  {avatares.map(av => (
-                    <button
-                      key={av}
-                      type="button"
-                      onClick={() => setRegAvatar(av)}
-                      className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl transition ${
-                        regAvatar === av
-                          ? "bg-emerald-100 dark:bg-emerald-500/20 border border-emerald-500 shadow-md scale-110"
-                          : "bg-white dark:bg-gray-800/40 border border-gray-200 dark:border-transparent hover:bg-gray-100 dark:hover:bg-gray-800"
-                      }`}
-                    >
-                      <span>{av}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {regPhotoType === "upload" && (
-                <div className="p-4 bg-gray-50 dark:bg-gray-950/40 rounded-xl border border-gray-200 dark:border-gray-800/80 space-y-3">
-                  <input
-                    type="file"
-                    onChange={handlePhotoUpload}
-                    accept="image/*"
-                    className="text-xs text-gray-600 dark:text-gray-400 file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-gray-200 dark:file:bg-gray-800 file:text-gray-700 dark:file:text-gray-300 hover:file:bg-gray-300 dark:hover:file:bg-gray-700"
-                  />
-                  <p className="text-[10px] text-gray-400 dark:text-gray-500">
-                    Máximo 2MB. Formatos: JPG, PNG, GIF.
-                  </p>
-                  {regPhotoBase64 && (
-                    <div className="flex items-center gap-2">
-                      <p className="text-[10px] text-emerald-600 dark:text-emerald-400">✓ Vista previa:</p>
-                      <img
-                        src={regPhotoBase64}
-                        alt="Preview"
-                        className="w-12 h-12 rounded-full object-cover border-2 border-emerald-500"
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* ===== SECCIÓN 3: SELECCIÓN DE EQUIPO POR GRUPOS (MINI TABLAS) ===== */}
-            <div className="space-y-5">
-              <h3 className="text-sm font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-2 border-b border-gray-200 dark:border-gray-800 pb-2">
-                Selecciona tu Equipo Mundialista
-              </h3>
-              <p className="text-[11px] text-gray-500 dark:text-gray-400 italic">
-                Cada equipo puede tener uno o varios representantes.
-                Elige con sabiduría... o según tu equipo favorito. ¡Tú decides!
-              </p>
-
-              {/* Equipos seleccionados (chips) */}
-              {regTeamIds.length > 0 && (
-                <div className="flex flex-wrap gap-2 p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl border border-emerald-200 dark:border-emerald-800/30">
-                  <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider self-center mr-1">
-                    Tus equipos ({regTeamIds.length}):
-                  </span>
-                  {regTeamIds.map(tid => {
-                    const tm = teams.find(t => t.id === tid);
-                    return tm ? (
-                      <span key={tid} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-xs font-semibold border border-emerald-200 dark:border-emerald-500/20">
-                        <img src={tm.flagUrl} alt={tm.name} className="w-4 h-3 object-cover rounded" />
-                        {tm.name}
-                        <button
-                          type="button"
-                          onClick={() => setRegTeamIds(prev => prev.filter(id => id !== tid))}
-                          className="ml-0.5 hover:bg-emerald-200 dark:hover:bg-emerald-500/20 rounded-full p-0.5"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </span>
-                    ) : null;
-                  })}
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {Object.entries(groupedTeams).map(([group, groupTeams]) => (
-                  <div
-                    key={group}
-                    className="rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden bg-white dark:bg-gray-950/30"
-                  >
-                    {/* Cabecera del Grupo */}
-                    <div className="bg-gradient-to-r from-emerald-500/10 to-emerald-600/5 dark:from-emerald-500/10 dark:to-transparent px-3 py-2 border-b border-gray-200 dark:border-gray-800">
-                      <span className="text-xs font-extrabold text-emerald-700 dark:text-emerald-400 tracking-wider">
-                        {GROUP_LABELS[group] || `Grupo ${group}`}
-                      </span>
-                    </div>
-
-                    {/* Equipos del Grupo */}
-                    <div className="divide-y divide-gray-100 dark:divide-gray-800/50">
-                      {groupTeams.map((team) => {
-                        const count = getParticipantCount(team.id);
-                        const isSelected = regTeamIds.includes(team.id);
-                        return (
-                          <button
-                            key={team.id}
-                            type="button"
-                            onClick={() => {
-                              setRegTeamIds(prev =>
-                                isSelected
-                                  ? prev.filter(id => id !== team.id)
-                                  : [...prev, team.id]
-                              );
-                            }}
-                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition text-xs ${
-                              isSelected
-                                ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 font-bold"
-                                : "hover:bg-gray-50 dark:hover:bg-gray-900/50 text-gray-700 dark:text-gray-300"
-                            }`}
-                          >
-                            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                              isSelected
-                                ? 'bg-emerald-500 border-emerald-500'
-                                : 'border-gray-300 dark:border-gray-600'
-                            }`}>
-                              {isSelected && (
-                                <CheckCircle2 className="w-3 h-3 text-white" />
-                              )}
-                            </div>
-                            <img
-                              src={team.flagUrl}
-                              alt={team.name}
-                              className="w-5 h-3.5 object-cover rounded shadow-sm flex-shrink-0"
-                              loading="lazy"
-                            />
-                            <span className="flex-1 truncate">{team.name}</span>
-                            {count > 0 && (
-                              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 font-semibold flex-shrink-0">
-                                {count}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* ===== BOTÓN DE REGISTRO ===== */}
-            <div className="pt-4">
-              <button
-                type="submit"
-                disabled={uploading}
-                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:from-emerald-600 hover:to-teal-700 dark:text-white font-extrabold shadow-xl shadow-emerald-500/10 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {uploading ? (
-                  <>
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                    Registrando...
-                  </>
-                ) : (
-                  <>
-                    <UserPlus className="w-5 h-5" /> Confirmar Mi Registro en la Quiniela
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
-        </div>
+        )}
       </div>
     </div>
   );
