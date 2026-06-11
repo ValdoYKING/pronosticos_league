@@ -25,6 +25,7 @@ export interface Participant {
   photo: string;
   status: 'activo' | 'eliminado';
   drawCount?: number; // Cantidad de sorteos (veces que saldrá en la tómbola). Default: 1
+  ordenPronostico?: number; // Orden de registro para el sorteo (auto-incremental). A menor número, primero en sortearse
 }
 
 export interface Match {
