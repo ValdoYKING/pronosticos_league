@@ -3,6 +3,7 @@ import { useState } from "react";
 import useQuinielaStore from "../store/quiniela";
 import { ShieldAlert, Sparkles, RefreshCw, Award, Trophy, Database, CheckCircle2, Loader2, UserPlus, Dices, Users, ListOrdered } from "lucide-react";
 import OrdenSorteoAdmin from "./OrdenSorteoAdmin";
+import type { Match } from "../lib/mockData";
 
 const Admin = () => {
   const { matches, teams, setMatchResult, resetTournament, simulateRandom, getGroupStandings, syncMatchResultsFromSupabase, supabaseAvailable, participants, setActiveTab, ordenSorteo } = useQuinielaStore();
@@ -42,7 +43,15 @@ const Admin = () => {
     });
   };
 
-  const stageConfigs: Record<string, any> = {
+  interface StageConfig {
+    title: string;
+    color: string;
+    waitingText: string;
+    gridCols: string;
+    showResultInput: boolean;
+  }
+
+  const stageConfigs: Record<string, StageConfig> = {
     Grupos: {
       title: "FASE DE GRUPOS",
       color: 'gray',
@@ -96,7 +105,7 @@ const Admin = () => {
     amber: { border: 'border-amber-200 dark:border-amber-500/20', text: 'text-amber-600 dark:text-amber-400', winner: 'bg-amber-50 dark:bg-amber-950 border-amber-300 dark:border-amber-500 text-amber-800 dark:text-amber-300', badge: 'bg-amber-500 text-white' },
   };
 
-  const renderMatchCard = (m: any, stageConfig: any) => {
+  const renderMatchCard = (m: Match, stageConfig: StageConfig) => {
     const cc = colorClasses[stageConfig.color];
     const hasResult = m.scoreA !== null && m.scoreB !== null;
     const scoreA = getScore(m.id, 'a');
@@ -181,7 +190,7 @@ const Admin = () => {
     );
   };
 
-  const renderStageSection = (stageName: string, matchesForStage: any[]) => {
+  const renderStageSection = (stageName: string, matchesForStage: Match[]) => {
     const stageConfig = stageConfigs[stageName];
     if (!stageConfig) return null;
     const cc = colorClasses[stageConfig.color] || colorClasses.gray;
@@ -204,41 +213,61 @@ const Admin = () => {
     return (
       <div key={group} className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-3">
         <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-2">Grupo {group}</h4>
-        <table className="w-full text-[10px]">
-          <thead>
-            <tr className="text-gray-400 dark:text-gray-500 border-b border-gray-200 dark:border-gray-800">
-              <th className="text-left py-1 pr-1">#</th>
-              <th className="text-left py-1 pr-1">Equipo</th>
-              <th className="text-center py-1 px-1">PJ</th>
-              <th className="text-center py-1 px-1">G</th>
-              <th className="text-center py-1 px-1">E</th>
-              <th className="text-center py-1 px-1">P</th>
-              <th className="text-center py-1 px-1">GF</th>
-              <th className="text-center py-1 px-1">GC</th>
-              <th className="text-center py-1 px-1">DIF</th>
-              <th className="text-center py-1 pl-1 font-bold">PTS</th>
-            </tr>
-          </thead>
-          <tbody>
-            {standings.map((t, i) => (
-              <tr key={t.id} className={`${i < 2 ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-gray-600 dark:text-gray-400'} border-b border-gray-100 dark:border-gray-900 last:border-0`}>
-                <td className="py-1 pr-1">{i + 1}</td>
-                <td className="py-1 pr-1 flex items-center gap-1">
-                  <img src={t.flagUrl} alt="" className="w-4 h-3 object-cover rounded" />
-                  <span className="truncate max-w-[70px]">{t.name}</span>
-                </td>
-                <td className="text-center py-1 px-1">{t.pj}</td>
-                <td className="text-center py-1 px-1">{t.pg}</td>
-                <td className="text-center py-1 px-1">{t.pe}</td>
-                <td className="text-center py-1 px-1">{t.pp}</td>
-                <td className="text-center py-1 px-1">{t.gf}</td>
-                <td className="text-center py-1 px-1">{t.gc}</td>
-                <td className="text-center py-1 px-1">{t.dif}</td>
-                <td className="text-center py-1 pl-1 font-bold">{t.pts}</td>
+        <div className="overflow-x-auto -mx-1">
+          <table className="w-full text-[10px] min-w-[380px]">
+            <thead>
+              <tr className="text-gray-400 dark:text-gray-500 border-b border-gray-200 dark:border-gray-800">
+                <th className="text-center py-1 px-0.5 w-6">Pos</th>
+                <th className="text-left py-1 pr-1">Equipo</th>
+                <th className="text-center py-1 px-1">PJ</th>
+                <th className="text-center py-1 px-1">PG</th>
+                <th className="text-center py-1 px-1">PE</th>
+                <th className="text-center py-1 px-1">PP</th>
+                <th className="text-center py-1 px-1">GF</th>
+                <th className="text-center py-1 px-1">GC</th>
+                <th className="text-center py-1 px-1">DG</th>
+                <th className="text-center py-1 pl-1 font-bold">Pts</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {standings.map((t) => {
+                const isQualified = t.pos <= 2;
+                return (
+                  <tr key={t.id} className={`${isQualified ? 'bg-emerald-50 dark:bg-emerald-950/30' : ''} border-b border-gray-100 dark:border-gray-900 last:border-0`}>
+                    <td className="text-center py-1 px-0.5">
+                      {isQualified ? (
+                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-500 text-white text-[8px] font-extrabold leading-none">{t.pos}</span>
+                      ) : (
+                        <span className="text-gray-400 dark:text-gray-500">{t.pos}</span>
+                      )}
+                    </td>
+                    <td className={`py-1 pr-1 ${isQualified ? 'text-gray-900 dark:text-white font-semibold' : 'text-gray-600 dark:text-gray-400'}`}>
+                      <span className="flex items-center gap-1">
+                        <img src={t.flagUrl} alt="" className="w-4 h-3 object-cover rounded flex-shrink-0" />
+                        <span className="truncate max-w-[70px]">{t.name}</span>
+                        {isQualified && (
+                          <span className="flex-shrink-0 text-[7px] uppercase px-1 py-0.5 rounded bg-emerald-500 text-white font-extrabold leading-none ml-auto">
+                            Clasifica
+                          </span>
+                        )}
+                      </span>
+                    </td>
+                    <td className={`text-center py-1 px-1 ${isQualified ? 'font-semibold text-gray-800 dark:text-gray-200' : 'text-gray-500 dark:text-gray-400'}`}>{t.pj}</td>
+                    <td className={`text-center py-1 px-1 ${isQualified ? 'font-semibold text-gray-800 dark:text-gray-200' : 'text-gray-500 dark:text-gray-400'}`}>{t.pg}</td>
+                    <td className={`text-center py-1 px-1 ${isQualified ? 'font-semibold text-gray-800 dark:text-gray-200' : 'text-gray-500 dark:text-gray-400'}`}>{t.pe}</td>
+                    <td className={`text-center py-1 px-1 ${isQualified ? 'font-semibold text-gray-800 dark:text-gray-200' : 'text-gray-500 dark:text-gray-400'}`}>{t.pp}</td>
+                    <td className={`text-center py-1 px-1 ${isQualified ? 'font-semibold text-gray-800 dark:text-gray-200' : 'text-gray-500 dark:text-gray-400'}`}>{t.gf}</td>
+                    <td className={`text-center py-1 px-1 ${isQualified ? 'font-semibold text-gray-800 dark:text-gray-200' : 'text-gray-500 dark:text-gray-400'}`}>{t.gc}</td>
+                    <td className={`text-center py-1 px-1 font-mono ${isQualified ? 'font-semibold text-gray-800 dark:text-gray-200' : 'text-gray-500 dark:text-gray-400'}`}>
+                      {t.dif > 0 ? `+${t.dif}` : t.dif}
+                    </td>
+                    <td className={`text-center py-1 pl-1 font-bold ${isQualified ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-700 dark:text-gray-300'}`}>{t.pts}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   };
