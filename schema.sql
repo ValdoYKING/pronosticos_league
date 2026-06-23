@@ -185,3 +185,47 @@ CREATE TRIGGER on_participants_updated
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('participant-photos', 'participant-photos', true)
 ON CONFLICT (id) DO NOTHING;
+
+
+-- ----------------------------
+-- 4. Create table for match results
+-- ----------------------------
+CREATE TABLE match_results (
+  match_id INTEGER PRIMARY KEY,
+  team_a_score INTEGER NOT NULL DEFAULT 0,
+  team_b_score INTEGER NOT NULL DEFAULT 0,
+  winner_id TEXT REFERENCES teams(id),
+  updated_by TEXT NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Index for efficient lookups by winner
+CREATE INDEX idx_match_results_winner_id ON match_results(winner_id);
+
+ALTER TABLE match_results ENABLE ROW LEVEL SECURITY;
+
+-- Everyone can read match results
+CREATE POLICY "Match results are viewable by everyone."
+  ON match_results FOR SELECT
+  USING ( true );
+
+-- Anyone can insert match results
+CREATE POLICY "Anyone can insert match results."
+  ON match_results FOR INSERT
+  WITH CHECK ( true );
+
+-- Anyone can update match results
+CREATE POLICY "Anyone can update match results."
+  ON match_results FOR UPDATE
+  USING ( true );
+
+-- Anyone can delete match results
+CREATE POLICY "Anyone can delete match results."
+  ON match_results FOR DELETE
+  USING ( true );
+
+-- Trigger to auto-update updated_at timestamp
+CREATE TRIGGER on_match_results_updated
+  BEFORE UPDATE ON match_results
+  FOR EACH ROW
+  EXECUTE PROCEDURE handle_updated_at();
