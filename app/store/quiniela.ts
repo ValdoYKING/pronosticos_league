@@ -19,7 +19,7 @@ type QuinielaState = {
   fetchInitialData: () => Promise<void>;
   registerUser: (name: string, email: string, teamIds: string[], photoType: 'avatar' | 'upload', photo: string) => Promise<void>;
   registerUserWithoutTeams: (name: string, email: string, photoType: 'avatar' | 'upload', photo: string, drawCount?: number) => Promise<void>;
-  assignRandomTeamToParticipant: (participantEmail: string) => Promise<{ team: any; assigned: boolean; isTopTeam?: boolean }>;
+  assignRandomTeamToParticipant: (participantEmail: string) => Promise<{ team: Team | null; assigned: boolean; isTopTeam?: boolean }>;
   deleteMyRegistration: () => Promise<void>;
   // Acciones de orden de sorteo
   fetchOrdenSorteo: () => Promise<void>;
@@ -32,7 +32,7 @@ type QuinielaState = {
   resetTournament: () => Promise<void>;
   simulateRandom: () => Promise<void>;
   recalculateTournament: () => void;
-  getGroupStandings: (group: string) => (Team & { pts: number; pj: number; pg: number; pe: number; pp: number; gf: number; gc: number; dif: number })[];
+  getGroupStandings: (group: string) => (Team & { pts: number; pj: number; pg: number; pe: number; pp: number; gf: number; gc: number; dif: number; pos: number })[];
   sendAccessCode: (email: string) => Promise<boolean>;
   verifyAccessCode: (email: string, code: string) => Promise<boolean>;
   verifyAccessByName: (email: string) => Promise<boolean>;
@@ -81,6 +81,7 @@ function clearObsoleteParticipantsCache() {
 // ============================================================
 // Función para calcular la clasificación desde grupos
 // Devuelve los IDs de los 32 equipos clasificados
+// Usa tiebreakers: Pts > DG > GF > Head-to-head (entre 2)
 // ============================================================
 function computeQualifiedTeams(teams: Team[], matches: Match[]): string[] {
   // Reiniciar stats de equipos
@@ -122,13 +123,9 @@ function computeQualifiedTeams(teams: Team[], matches: Match[]): string[] {
     groups[t.group].push(t);
   }
 
-  // Ordenar cada grupo: puntos > dif > gf
+  // Ordenar cada grupo con tiebreakers: Pts desc > DG desc > GF desc > head-to-head (2 equipos)
   for (const g of Object.keys(groups)) {
-    groups[g].sort((a, b) => {
-      if (b.pts !== a.pts) return b.pts - a.pts;
-      if (b.dif !== a.dif) return b.dif - a.dif;
-      return b.gf - a.gf;
-    });
+    groups[g].sort((a, b) => sortGroupTeams(a, b, groupMatches, g));
   }
 
   // Top 2 de cada grupo (24 equipos)
@@ -151,6 +148,42 @@ function computeQualifiedTeams(teams: Team[], matches: Match[]): string[] {
   const bestThirds = thirdPlaced.slice(0, 8).map(t => t.id);
 
   return [...topTwo, ...bestThirds];
+}
+
+// ============================================================
+// Tiebreaker comparator for group standings
+// Priority: Pts desc → DG desc → GF desc → head-to-head (2 teams)
+// Fair play and lottery are placeholders for now
+// ============================================================
+function sortGroupTeams(
+  a: { id: string; group: string; pts: number; dif: number; gf: number },
+  b: { id: string; group: string; pts: number; dif: number; gf: number },
+  groupMatches: (Match & { scoreA: number; scoreB: number })[],
+  group: string,
+): number {
+  // 1. Points (descending)
+  if (b.pts !== a.pts) return b.pts - a.pts;
+  // 2. Goal difference (descending)
+  if (b.dif !== a.dif) return b.dif - a.dif;
+  // 3. Goals scored (descending)
+  if (b.gf !== a.gf) return b.gf - a.gf;
+
+  // 4. Head-to-head between exactly these 2 teams
+  // Find the match where these two played each other in this group
+  const h2h = groupMatches.find(
+    m => m.group === group &&
+      ((m.teamAId === a.id && m.teamBId === b.id) || (m.teamAId === b.id && m.teamBId === a.id)),
+  );
+  if (h2h) {
+    const aIsHome = h2h.teamAId === a.id;
+    if (h2h.scoreA > h2h.scoreB) return aIsHome ? -1 : 1;
+    if (h2h.scoreB > h2h.scoreA) return aIsHome ? 1 : -1;
+    // Draw in head-to-head → tie remains (proceed to fair play placeholder)
+  }
+
+  // 5. Fair play — placeholder, no data available yet
+  // 6. Draw/lottery — placeholder
+  return 0;
 }
 
 // ============================================================
@@ -212,18 +245,22 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
       }
 
       if (participantsData) {
-        const mappedParticipants: Participant[] = participantsData.map((p: any) => ({
-          id: p.email || p.id,
-          name: p.name,
-          email: p.email,
-          teamIds: p.team_ids || (p.team_id ? [p.team_id] : []),
-          photoType: p.photo_type === 'upload' && p.photo && p.photo.startsWith('http') ? 'upload' : 'avatar',
-          photo: p.photo_type === 'upload' && p.photo && p.photo.startsWith('http') ? p.photo : (p.photo && p.photo.length <= 2 ? p.photo : '💼'),
-          status: 'activo',
-          drawCount: p.draw_count ?? 1,
-          ordenesSorteo: p.ordenes_sorteo ?? undefined,
-          ordenPronostico: p.orden_pronostico ?? undefined,
-        }));
+        const mappedParticipants: Participant[] = participantsData.map((p: Record<string, unknown>) => {
+          const photo = p.photo as string | null;
+          const photoType = (p.photo_type === 'upload' && photo && (photo as string).startsWith('http')) ? 'upload' as const : 'avatar' as const;
+          return {
+            id: (p.email || p.id) as string,
+            name: p.name as string,
+            email: p.email as string,
+            teamIds: (p.team_ids || (p.team_id ? [p.team_id] : [])) as string[],
+            photoType,
+            photo: photoType === 'upload' && photo ? photo as string : (photo && (photo as string).length <= 2 ? photo as string : '💼'),
+            status: 'activo' as const,
+            drawCount: (p.draw_count ?? 1) as number,
+            ordenesSorteo: p.ordenes_sorteo as number[] | undefined,
+            ordenPronostico: p.orden_pronostico as number | undefined,
+          };
+        });
 
         // Sincronizar myRegistration con datos frescos de Supabase
         const myReg = savedRegistration?.email
@@ -454,7 +491,7 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
     // ============================================================
     // LÓGICA DE COMPENSACIÓN CON TOP TEAMS
     // ============================================================
-    let selectedTeam: any = null;
+    let selectedTeam: Team | null = null;
 
     const alreadyHasTopTeam = currentTeamIds.some(tid => TOP_TEAM_IDS.includes(tid));
 
@@ -590,12 +627,12 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
       }
 
       if (data) {
-        const mapped: OrdenSorteo[] = data.map((row: any) => ({
-          id: row.id,
-          posicion: row.posicion,
-          participantEmail: row.participant_email,
-          participantName: row.participant_name,
-          status: row.status,
+        const mapped: OrdenSorteo[] = data.map((row: Record<string, unknown>) => ({
+          id: row.id as number,
+          posicion: row.posicion as number,
+          participantEmail: row.participant_email as string | null,
+          participantName: row.participant_name as string | null,
+          status: row.status as OrdenSorteo['status'],
         }));
 
         // Calcular la siguiente posición pendiente
@@ -727,14 +764,18 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
   },
 
   // ============================================================
-  // NUEVO: Obtener tabla de posiciones de un grupo
+  // Obtener tabla de posiciones de un grupo con tiebreakers
+  // PJ, PG, PE, PP, GF, GC, DG, Pts (3pts win, 1pt draw, 0pts loss)
+  // Orden: Pts desc → DG desc → GF desc → Head-to-head (2 equipos)
+  // Retorna array con posición (pos: 1 = primero, 2 = segundo, etc.)
+  // Top 2 clasifican a Dieciseisavos de Final
   // ============================================================
   getGroupStandings: (group: string) => {
     const { teams, matches } = get();
     const groupTeams = teams.filter(t => t.group === group);
     const stats = groupTeams.map(t => ({
       ...t,
-      pts: 0, pj: 0, pg: 0, pe: 0, pp: 0, gf: 0, gc: 0, dif: 0,
+      pts: 0, pj: 0, pg: 0, pe: 0, pp: 0, gf: 0, gc: 0, dif: 0, pos: 0,
     }));
 
     const groupMatches = matches.filter((m): m is Match & { scoreA: number; scoreB: number } => m.stage === 'Grupos' && m.group === group && m.scoreA !== null && m.scoreB !== null);
@@ -751,11 +792,20 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
       else { a.pe++; b.pe++; a.pts += 1; b.pts += 1; }
     }
     for (const s of stats) s.dif = s.gf - s.gc;
-    stats.sort((a, b) => {
-      if (b.pts !== a.pts) return b.pts - a.pts;
-      if (b.dif !== a.dif) return b.dif - a.dif;
-      return b.gf - a.gf;
-    });
+
+    // Sort using tiebreaker logic
+    stats.sort((a, b) => sortGroupTeams(
+      { id: a.id, group, pts: a.pts, dif: a.dif, gf: a.gf },
+      { id: b.id, group, pts: b.pts, dif: b.dif, gf: b.gf },
+      groupMatches,
+      group,
+    ));
+
+    // Assign positions (1-based)
+    for (let i = 0; i < stats.length; i++) {
+      stats[i].pos = i + 1;
+    }
+
     return stats;
   },
 
@@ -815,11 +865,11 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
         pts: 0, pj: 0, pg: 0, pe: 0, pp: 0, gf: 0, gc: 0, dif: 0,
       }));
 
-      // Deep copy de matches - resetear eliminatorias
+      // Deep copy de matches - resetear eliminatorias (incluyendo scores)
       const matches = state.matches.map(m => {
         if (m.stage === 'Grupos') return { ...m };
-        // Reset eliminatorias pero preservar scores si ya existen
-        return { ...m, teamAId: null, teamBId: null, winnerId: null };
+        // Reset eliminatorias: equipos, scores y winner
+        return { ...m, teamAId: null, teamBId: null, scoreA: null, scoreB: null, winnerId: null };
       });
 
       // === FASE 1: Procesar resultados de grupos ===
@@ -839,16 +889,19 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
       for (const t of teams) t.dif = t.gf! - t.gc!;
 
       // ════════════════════════════════════════════════════════════
-      // PROTECCIÓN: Si NO hay resultados de grupos, no se ejecuta
-      // la lógica de clasificación ni se llena el bracket.
-      // Todos los equipos se quedan en "Fase de Grupos" con status "activo".
+      // PROTECCIÓN: Solo se ejecuta la lógica de clasificación
+      // y llenado del bracket cuando TODOS los partidos de grupo
+      // (72 partidos: 12 grupos × 6 partidos c/u) tienen resultado.
+      // Con resultados parciales, los equipos se mantienen activos
+      // en Fase de Grupos y no se llena ningún bracket.
       // ════════════════════════════════════════════════════════════
-      const hayResultadosDeGrupos = groupMatches.length > 0;
+      const totalGroupMatches = matches.filter(m => m.stage === 'Grupos').length;
+      const hayResultadosDeGrupos = groupMatches.length === totalGroupMatches;
 
       if (!hayResultadosDeGrupos) {
         // Sin resultados aún: equipos y participantes todos activos
         const participants = state.participants.map(p => ({ ...p, status: 'activo' as const }));
-        let myRegistration = state.myRegistration ? { ...state.myRegistration, status: 'activo' as const } : null;
+        const myRegistration = state.myRegistration ? { ...state.myRegistration, status: 'activo' as const } : null;
         return { teams, matches, participants, myRegistration };
       }
 
@@ -974,7 +1027,7 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
         return { ...p, status: anyActive ? 'activo' as const : 'eliminado' as const };
       });
 
-      let myRegistration = state.myRegistration ? { ...state.myRegistration } : null;
+      const myRegistration = state.myRegistration ? { ...state.myRegistration } : null;
       if (myRegistration) {
         if (!myRegistration.teamIds || myRegistration.teamIds.length === 0) {
           myRegistration.status = 'eliminado';
@@ -1202,6 +1255,17 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
 
   // ============================================================
   // Guardar resultado de un partido en Supabase
+  //
+  // DDL para la tabla match_results:
+  //   CREATE TABLE IF NOT EXISTS match_results (
+  //     match_id     INTEGER PRIMARY KEY,
+  //     team_a_score INTEGER,
+  //     team_b_score INTEGER,
+  //     winner_id    TEXT,
+  //     updated_by   TEXT,
+  //     updated_at   TIMESTAMPTZ DEFAULT now()
+  //   );
+  //   CREATE UNIQUE INDEX IF NOT EXISTS idx_match_results_match_id ON match_results(match_id);
   // ============================================================
   saveMatchResultToSupabase: async (matchId, scoreA, scoreB, winnerId, updatedBy) => {
     try {
