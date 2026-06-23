@@ -2,7 +2,7 @@
 "use client";
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import useQuinielaStore from "../store/quiniela";
-import { Participant } from "../lib/mockData";
+import { Participant, Team } from "../lib/mockData";
 import { 
   Dice5, Trophy, Users, RefreshCw, X, 
   PartyPopper, Loader2, Dices, ArrowRight
@@ -21,14 +21,14 @@ const Sorteo = () => {
   // Estado del sorteo
   const [isSpinning, setIsSpinning] = useState(false);
   const [showWinner, setShowWinner] = useState(false);
-  const [currentWinner, setCurrentWinner] = useState<any>(null);
-  const [assignedTeam, setAssignedTeam] = useState<any>(null);
-  const [confetti, setConfetti] = useState<{ id: number; x: number; y: number; emoji: string }[]>([]);
+  const [currentWinner, setCurrentWinner] = useState<Participant | null>(null);
+  const [assignedTeam, setAssignedTeam] = useState<Team | null>(null);
+  const [confetti, setConfetti] = useState<{ id: number; x: number; y: number; emoji: string; animDuration: string }[]>([]);
   const [spinPhase, setSpinPhase] = useState<"idle" | "shuffling" | "selecting" | "teamShuffling" | "result">("idle");
   const [animationProgress, setAnimationProgress] = useState(0);
   // Estado para la ruleta de banderas
-  const [displayFlagTeam, setDisplayFlagTeam] = useState<any>(null);
-  const [selectedWinner, setSelectedWinner] = useState<any>(null);
+  const [displayFlagTeam, setDisplayFlagTeam] = useState<Team | null>(null);
+  const [selectedWinner, setSelectedWinner] = useState<Participant | null>(null);
   const [isTopTeamAssigned, setIsTopTeamAssigned] = useState(false);
   const [showTopTeamGlow, setShowTopTeamGlow] = useState(false);
   
@@ -96,7 +96,7 @@ const Sorteo = () => {
 
   // Equipos ya asignados (con su representante)
   const assignedTeamsWithRepresentatives = useMemo(() => {
-    const result: { team: any; representatives: any[] }[] = [];
+    const result: { team: Team; representatives: Participant[] }[] = [];
     for (const p of participantsCompleted) {
       if (p.teamIds) {
         for (const tid of p.teamIds) {
@@ -125,6 +125,61 @@ const Sorteo = () => {
       if (shuffleRef.current) clearInterval(shuffleRef.current);
     };
   }, []);
+
+  const launchConfetti = useCallback(() => {
+    const emojis = ["🎉", "🎊", "⭐", "✨", "🏆", "🥳", "🎯", "💫", "🌟", "🎲"];
+    const newConfetti: { id: number; x: number; y: number; emoji: string; animDuration: string }[] = [];
+    for (let i = 0; i < 30; i++) {
+      confettiIdRef.current++;
+      newConfetti.push({
+        id: confettiIdRef.current,
+        x: Math.random() * 100,
+        y: -10 - Math.random() * 20,
+        emoji: emojis[Math.floor(Math.random() * emojis.length)],
+        animDuration: `${0.5 + Math.random()}s`,
+      });
+    }
+    setConfetti(newConfetti);
+
+    let frame = 0;
+    const maxFrames = 60;
+    const confettiInterval = setInterval(() => {
+      frame++;
+      setConfetti(prev => prev.map(c => ({
+        ...c,
+        y: c.y + 2 + Math.random() * 3,
+        x: c.x + (Math.random() - 0.5) * 2,
+      })));
+      if (frame >= maxFrames) {
+        clearInterval(confettiInterval);
+        setConfetti([]);
+      }
+    }, 50);
+  }, []);
+
+  const handleAssignTeam = useCallback(async (email: string) => {
+    const result = await assignRandomTeamToParticipant(email);
+    if (result.assigned && result.team) {
+      setAssignedTeam(result.team);
+      setIsTopTeamAssigned(result.isTopTeam ?? false);
+      setShowTopTeamGlow(result.isTopTeam ?? false);
+      // Una vez asignado, fijamos la bandera final en la ruleta
+      setDisplayFlagTeam(result.team);
+      // Actualizar el avatar del ganador con la bandera del equipo asignado
+      setCurrentWinner((prev) => {
+        if (prev && result.team) {
+          return {
+            ...prev,
+            photoType: 'upload' as const,
+            photo: result.team.flagUrl,
+          };
+        }
+        return prev;
+      });
+    } else if (!result.assigned) {
+      toast.error("No se pudo asignar un equipo. Verifica que haya equipos disponibles.");
+    }
+  }, [assignRandomTeamToParticipant]);
 
   const startSorteo = useCallback(() => {
     if (participantsAvailable.length === 0) {
@@ -206,61 +261,7 @@ const Sorteo = () => {
         }, 100);
       }
     }, 100);
-  }, [participantsAvailable, availableTeams]);
-
-  const handleAssignTeam = async (email: string) => {
-    const result = await assignRandomTeamToParticipant(email);
-    if (result.assigned && result.team) {
-      setAssignedTeam(result.team);
-      setIsTopTeamAssigned(result.isTopTeam ?? false);
-      setShowTopTeamGlow(result.isTopTeam ?? false);
-      // Una vez asignado, fijamos la bandera final en la ruleta
-      setDisplayFlagTeam(result.team);
-      // Actualizar el avatar del ganador con la bandera del equipo asignado
-      setCurrentWinner((prev: any) => {
-        if (prev) {
-          return {
-            ...prev,
-            photoType: 'upload' as const,
-            photo: result.team.flagUrl,
-          };
-        }
-        return prev;
-      });
-    } else if (!result.assigned) {
-      toast.error("No se pudo asignar un equipo. Verifica que haya equipos disponibles.");
-    }
-  };
-
-  const launchConfetti = () => {
-    const emojis = ["🎉", "🎊", "⭐", "✨", "🏆", "🥳", "🎯", "💫", "🌟", "🎲"];
-    const newConfetti = [];
-    for (let i = 0; i < 30; i++) {
-      confettiIdRef.current++;
-      newConfetti.push({
-        id: confettiIdRef.current,
-        x: Math.random() * 100,
-        y: -10 - Math.random() * 20,
-        emoji: emojis[Math.floor(Math.random() * emojis.length)],
-      });
-    }
-    setConfetti(newConfetti);
-
-    let frame = 0;
-    const maxFrames = 60;
-    const confettiInterval = setInterval(() => {
-      frame++;
-      setConfetti(prev => prev.map(c => ({
-        ...c,
-        y: c.y + 2 + Math.random() * 3,
-        x: c.x + (Math.random() - 0.5) * 2,
-      })));
-      if (frame >= maxFrames) {
-        clearInterval(confettiInterval);
-        setConfetti([]);
-      }
-    }, 50);
-  };
+  }, [participantsAvailable, availableTeams, getSiguientePendiente, handleAssignTeam, launchConfetti]);
 
   const resetSorteo = () => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -292,7 +293,7 @@ const Sorteo = () => {
                 <span
                   key={c.id}
                   className="absolute text-2xl animate-bounce"
-                  style={{ left: `${c.x}%`, top: `${c.y}%`, animationDuration: `${0.5 + Math.random()}s` }}
+                  style={{ left: `${c.x}%`, top: `${c.y}%`, animationDuration: c.animDuration }}
                 >
                   {c.emoji}
                 </span>
@@ -732,7 +733,7 @@ const Sorteo = () => {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {participantsCompleted.map(p => {
-                const teamNames = (p.teamIds || []).map(tid => teams.find(t => t.id === tid)).filter(Boolean);
+                const teamNames = (p.teamIds || []).map(tid => teams.find(t => t.id === tid)).filter((t): t is Team => t !== undefined);
                 return (
                   <div key={p.email} className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/30 text-xs">
                     {p.photoType === "upload" && p.photo && p.photo !== '💼' && p.photo.startsWith('http') ? (
@@ -750,7 +751,7 @@ const Sorteo = () => {
                         </span>
                       </div>
                       <div className="flex gap-1 mt-0.5">
-                        {teamNames.map((t: any) => (
+                        {teamNames.map((t) => (
                           <img key={t.id} src={t.flagUrl} alt={t.name} className="w-4 h-3 object-cover rounded shadow-sm" title={t.name} />
                         ))}
                       </div>
