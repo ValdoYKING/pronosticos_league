@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
-import { MOCK_MATCHES, MOCK_PARTICIPANTS, MOCK_TEAMS } from '../lib/mockData';
+import { DIECISEISAVOS_PAIRINGS, MOCK_MATCHES, MOCK_PARTICIPANTS, MOCK_TEAMS } from '../lib/mockData';
 import type { Team, Participant, Match, OrdenSorteo } from '../lib/mockData';
 
 type QuinielaState = {
@@ -29,6 +29,7 @@ type QuinielaState = {
   saltarPosicionSorteo: (posicion: number) => Promise<void>;
   // Acciones de torneo
   setMatchResult: (matchId: number, scoreA: number, scoreB: number) => void;
+  setKnockoutWinner: (matchId: number, winnerId: string, scoreA?: number, scoreB?: number) => void;
   resetTournament: () => Promise<void>;
   simulateRandom: () => Promise<void>;
   recalculateTournament: () => void;
@@ -37,7 +38,7 @@ type QuinielaState = {
   verifyAccessCode: (email: string, code: string) => Promise<boolean>;
   verifyAccessByName: (email: string) => Promise<boolean>;
   syncMatchResultsFromSupabase: () => Promise<void>;
-  saveMatchResultToSupabase: (matchId: number, scoreA: number, scoreB: number, winnerId: string | null, updatedBy: string) => Promise<void>;
+  saveMatchResultToSupabase: (matchId: number, scoreA: number | null, scoreB: number | null, winnerId: string | null, updatedBy: string) => Promise<void>;
 };
 
 // ============================================================
@@ -852,6 +853,43 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
   },
 
   // ============================================================
+  // setKnockoutWinner - asigna ganador manual en eliminatorias
+  // con o sin scores opcionales, y persiste el resultado
+  // ============================================================
+  setKnockoutWinner: (matchId, winnerId, scoreA, scoreB) => {
+    const currentMatch = get().matches.find(m => m.id === matchId) ?? null;
+    const isTeamAWinner = currentMatch?.teamAId === winnerId;
+    const resolvedScoreA = scoreA ?? currentMatch?.scoreA ?? (isTeamAWinner ? 1 : 0);
+    const resolvedScoreB = scoreB ?? currentMatch?.scoreB ?? (isTeamAWinner ? 0 : 1);
+
+    set(state => {
+      const matches = state.matches.map(m => {
+        if (m.id !== matchId) return m;
+        return {
+          ...m,
+          winnerId,
+          scoreA: resolvedScoreA,
+          scoreB: resolvedScoreB,
+        };
+      });
+      return { matches };
+    });
+
+    get().recalculateTournament();
+
+    const state = get();
+    if (state.supabaseAvailable && state.myRegistration?.email) {
+      get().saveMatchResultToSupabase(matchId, resolvedScoreA, resolvedScoreB, winnerId, state.myRegistration.email);
+    }
+
+    const match = state.matches.find(m => m.id === matchId);
+    const winnerTeam = state.teams.find(t => t.id === winnerId);
+    if (match && winnerTeam) {
+      toast.success(`¡${winnerTeam.flag} ${winnerTeam.name} avanza a la siguiente fase!`);
+    }
+  },
+
+  // ============================================================
   // recalculateTournament - con protección: si no hay resultados
   // de grupos, no elimina equipos ni llena eliminatorias
   // ============================================================
@@ -865,11 +903,11 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
         pts: 0, pj: 0, pg: 0, pe: 0, pp: 0, gf: 0, gc: 0, dif: 0,
       }));
 
-      // Deep copy de matches - resetear eliminatorias (incluyendo scores)
+      // Deep copy de matches - preservar eliminatorias para poder propagar
+      // los ganadores manuales hacia la siguiente fase.
       const matches = state.matches.map(m => {
         if (m.stage === 'Grupos') return { ...m };
-        // Reset eliminatorias: equipos, scores y winner
-        return { ...m, teamAId: null, teamBId: null, scoreA: null, scoreB: null, winnerId: null };
+        return { ...m };
       });
 
       // === FASE 1: Procesar resultados de grupos ===
@@ -920,52 +958,12 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
       // === FASE 3: Llenar bracket de Dieciseisavos ===
       const d16Matches = matches.filter(m => m.stage === 'Dieciseisavos').sort((a, b) => a.id - b.id);
 
-      // Asignación estándar para 32 equipos:
-      // 1A vs 3B/C/D/E/F, 2A vs 2B, 1B vs 3A/C/D/E/F, etc.
-      // Usamos un bracket predefinido basado en la clasificación final
-      const byGroup: Record<string, string[]> = {};
-      const groups = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
-      for (const g of groups) {
-        const standings = get().getGroupStandings(g);
-        byGroup[g] = standings.filter(s => qualified.includes(s.id)).map(s => s.id);
-        // Si hay 3 clasificados del grupo, el 3° es un mejor tercero
-      }
-
-      // Bracket de Dieciseisavos (cruce estándar de grupos)
-      // Partido 1: 1A vs 3B/C/D/E/F (el mejor tercero)
-      // Partido 2: 2A vs 2B
-      // Partido 3: 1B vs 3A/C/D/E/F
-      // Partido 4: 2C vs 2D
-      // ... y así sucesivamente
-
-      // Para simplificar, usamos un bracket fijo ordenado por la clasificación
-      const order: string[] = [];
-      for (const g of groups) {
-        if (byGroup[g] && byGroup[g].length > 0) {
-          // 1° del grupo
-          order.push(byGroup[g][0]);
-        }
-      }
-      for (const g of groups) {
-        if (byGroup[g] && byGroup[g].length > 1) {
-          // 2° del grupo
-          order.push(byGroup[g][1]);
-        }
-      }
-      // Mejores terceros (los que tengan 3 o más clasificados)
-      for (const g of groups) {
-        if (byGroup[g] && byGroup[g].length > 2) {
-          order.push(byGroup[g][2]);
-        }
-      }
-
-      // Asignar a los 16 partidos de Dieciseisavos
-      const totalTeams = Math.min(order.length, 32);
-      for (let i = 0; i < 16 && i * 2 + 1 < totalTeams; i++) {
-        if (d16Matches[i]) {
-          d16Matches[i].teamAId = order[i % totalTeams];
-          d16Matches[i].teamBId = order[(i + 16) % totalTeams];
-        }
+      // Orden fijo de dieciseisavos para respetar el cuadro esperado.
+      for (let i = 0; i < d16Matches.length && i < DIECISEISAVOS_PAIRINGS.length; i++) {
+        const [teamAId, teamBId] = DIECISEISAVOS_PAIRINGS[i];
+        if (!qualified.includes(teamAId) || !qualified.includes(teamBId)) continue;
+        d16Matches[i].teamAId = teamAId;
+        d16Matches[i].teamBId = teamBId;
       }
 
       // === FASE 4: Procesar eliminatorias ===
@@ -1270,18 +1268,19 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
   saveMatchResultToSupabase: async (matchId, scoreA, scoreB, winnerId, updatedBy) => {
     try {
       // Upsert: inserta o actualiza si ya existe
+      const payload: Record<string, number | string | null> = {
+        match_id: matchId,
+        winner_id: winnerId,
+        updated_by: updatedBy,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (scoreA !== null && scoreA !== undefined) payload.team_a_score = scoreA;
+      if (scoreB !== null && scoreB !== undefined) payload.team_b_score = scoreB;
+
       const { error } = await supabase
         .from('match_results')
-        .upsert({
-          match_id: matchId,
-          team_a_score: scoreA,
-          team_b_score: scoreB,
-          winner_id: winnerId,
-          updated_by: updatedBy,
-          updated_at: new Date().toISOString(),
-        }, {
-          onConflict: 'match_id',
-        });
+        .upsert(payload, { onConflict: 'match_id' });
 
       if (error) {
         console.warn('[saveMatchResult] Error saving to Supabase:', error.message);
@@ -1293,4 +1292,3 @@ const useQuinielaStore = create<QuinielaState>((set, get) => ({
 }));
 
 export default useQuinielaStore;
-
