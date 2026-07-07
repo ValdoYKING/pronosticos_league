@@ -7,6 +7,7 @@ import {
   ShieldAlert,
   Dices,
   LogOut,
+  Swords,
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { useMemo, useState, useEffect } from "react";
@@ -22,17 +23,28 @@ const ADMIN_EMAILS = [
   "dulce.mg.19@gmail.com"
 ];
 
+import type { Team } from "../lib/mockData";
+
+interface LayoutProps {
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+  myRegistration: { email?: string; name?: string; photoType?: string; photo?: string; status?: string; teamIds?: string[] } | null;
+  getTeamById: (id: string) => Team | undefined;
+  children: React.ReactNode;
+}
+
 const Layout = ({
   activeTab,
   setActiveTab,
   myRegistration,
   getTeamById,
   children,
-}: any) => {
+}: LayoutProps) => {
   const [mounted, setMounted] = useState(false);
   const [showLogout, setShowLogout] = useState(false);
   const { open: openLoginModal } = useLoginModalStore();
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -213,6 +225,17 @@ const Layout = ({
               <Users className="w-4 h-4" /> Representantes
             </button>
 
+            <button
+              onClick={() => setActiveTab("bracket")}
+              className={`px-3 py-2 rounded-t-lg text-sm font-semibold flex items-center gap-2 transition ${
+                activeTab === "bracket"
+                  ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-b-2 border-purple-500"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/40 dark:hover:bg-gray-800/40"
+              }`}
+            >
+              <Swords className="w-4 h-4" /> Cuadro
+            </button>
+
             {mounted && isAdmin && (
               <button
                 onClick={() => setActiveTab("admin")}
@@ -289,6 +312,17 @@ const Layout = ({
           >
             <Users className="w-4 h-4" />
             <span>Representantes</span>
+          </button>
+          <button
+            onClick={() => setActiveTab("bracket")}
+            className={`flex flex-col items-center gap-1 ${
+              activeTab === "bracket"
+                ? "text-purple-600 dark:text-purple-400"
+                : "text-gray-500 dark:text-gray-400"
+            }`}
+          >
+            <Swords className="w-4 h-4" />
+            <span>Cuadro</span>
           </button>
           {mounted && isAdmin && (
             <button
