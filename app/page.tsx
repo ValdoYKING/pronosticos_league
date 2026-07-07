@@ -8,6 +8,7 @@ import Register from "./components/Register";
 import Representantes from "./components/Representantes";
 import Admin from "./components/Admin";
 import Sorteo from "./components/Sorteo";
+import BracketView from "./components/BracketView";
 import LoginModal from "./components/LoginModal";
 
 // 📧 Correos autorizados para ver la Consola Admin y el panel de registro
@@ -66,6 +67,8 @@ export default function Home() {
         return <Representantes />;
       case "admin":
         return isAdmin ? <Admin /> : <Dashboard />;
+      case "bracket":
+        return <BracketView />;
       default:
         return <Dashboard />;
     }
