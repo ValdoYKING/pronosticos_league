@@ -56,6 +56,48 @@ export interface Match {
   group?: string;
 }
 
+export const DIECISEISAVOS_PAIRINGS = [
+  ['GER', 'PAR'],
+  ['FRA', 'SWE'],
+  ['RSA', 'CAN'],
+  ['NED', 'MAR'],
+  ['POR', 'CRO'],
+  ['ESP', 'AUT'],
+  ['USA', 'BIH'],
+  ['BEL', 'SEN'],
+  ['BRA', 'JPN'],
+  ['CIV', 'NOR'],
+  ['MEX', 'ECU'],
+  ['ENG', 'COD'],
+  ['ARG', 'CPV'],
+  ['AUS', 'EGY'],
+  ['SUI', 'ALG'],
+  ['COL', 'GHA'],
+] as const;
+
+const D16_ORDER_MAP = new Map(
+  DIECISEISAVOS_PAIRINGS.map((pair, index) => [pair.slice().sort().join('-'), index]),
+);
+
+function getPairKey(teamAId: string | null, teamBId: string | null) {
+  if (!teamAId || !teamBId) return null;
+  return [teamAId, teamBId].sort().join('-');
+}
+
+export function sortMatchesForStage(stage: string, matches: Match[]): Match[] {
+  return [...matches].sort((a, b) => {
+    if (stage === 'Dieciseisavos') {
+      const aKey = getPairKey(a.teamAId, a.teamBId);
+      const bKey = getPairKey(b.teamAId, b.teamBId);
+      const aIndex = aKey ? D16_ORDER_MAP.get(aKey) ?? Number.MAX_SAFE_INTEGER : Number.MAX_SAFE_INTEGER;
+      const bIndex = bKey ? D16_ORDER_MAP.get(bKey) ?? Number.MAX_SAFE_INTEGER : Number.MAX_SAFE_INTEGER;
+      if (aIndex !== bIndex) return aIndex - bIndex;
+    }
+
+    return a.id - b.id;
+  });
+}
+
 export const GROUP_LABELS: Record<string, string> = {
   A: 'Grupo A', B: 'Grupo B', C: 'Grupo C', D: 'Grupo D',
   E: 'Grupo E', F: 'Grupo F', G: 'Grupo G', H: 'Grupo H',
@@ -235,6 +277,14 @@ mid += 2;
 const f1Matches: Match[] = [
   { id: mid, stage: 'Final', teamAId: null, teamBId: null, winnerId: null, scoreA: null, scoreB: null, date: '13 Jul 16:00', venue: 'MetLife Stadium, NY', nextMatchId: null, slot: null },
 ];
+mid += 1;
+
+// ============================================================
+// TERCER LUGAR (1)
+// ============================================================
+const tlMatches: Match[] = [
+  { id: mid, stage: 'TercerLugar', teamAId: null, teamBId: null, winnerId: null, scoreA: null, scoreB: null, date: '12 Jul 19:00', venue: 'Hard Rock Stadium, Miami', nextMatchId: null, slot: null },
+];
 
 export const MOCK_MATCHES: Match[] = [
   ...groupMatchesArr,
@@ -243,6 +293,7 @@ export const MOCK_MATCHES: Match[] = [
   ...c4Matches,
   ...s2Matches,
   ...f1Matches,
+  ...tlMatches,
 ];
 
 export const MOCK_PARTICIPANTS: Participant[] = [];
