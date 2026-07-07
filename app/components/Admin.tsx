@@ -1,16 +1,18 @@
 "use client";
 import { useState } from "react";
 import useQuinielaStore from "../store/quiniela";
-import { ShieldAlert, Sparkles, RefreshCw, Award, Trophy, Database, CheckCircle2, Loader2, UserPlus, Dices, Users, ListOrdered } from "lucide-react";
+import { ShieldAlert, Sparkles, RefreshCw, Award, Trophy, Database, CheckCircle2, Loader2, UserPlus, Dices, Users, ListOrdered, ChevronRight, Crown } from "lucide-react";
 import OrdenSorteoAdmin from "./OrdenSorteoAdmin";
 import type { Match } from "../lib/mockData";
 
 const Admin = () => {
-  const { matches, teams, setMatchResult, resetTournament, simulateRandom, getGroupStandings, syncMatchResultsFromSupabase, supabaseAvailable, participants, setActiveTab, ordenSorteo } = useQuinielaStore();
+  const { matches, teams, setMatchResult, setKnockoutWinner, resetTournament, simulateRandom, getGroupStandings, syncMatchResultsFromSupabase, supabaseAvailable, participants, setActiveTab, ordenSorteo } = useQuinielaStore();
   const [scores, setScores] = useState<Record<number, { a: number | string; b: number | string }>>({});
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [showOrdenSorteo, setShowOrdenSorteo] = useState(false);
+  // Estado para scores opcionales en partidos knockout (para usar con setKnockoutWinner)
+  const [knockoutScores, setKnockoutScores] = useState<Record<number, { a: number | string; b: number | string }>>({});
 
   const getTeam = (id: string | null) => teams.find(t => t.id === id);
 
@@ -63,22 +65,22 @@ const Admin = () => {
       title: "DIECISÉISAVOS DE FINAL",
       color: 'orange',
       waitingText: 'Esperando clasificados...',
-      gridCols: 'grid-cols-1 md:grid-cols-2 xl:grid-cols-4',
-      showResultInput: true,
+      gridCols: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4',
+      showResultInput: false,
     },
     Octavos: {
       title: "OCTAVOS DE FINAL",
       color: 'emerald',
       waitingText: 'Esperando resultados...',
-      gridCols: 'grid-cols-1 md:grid-cols-2 xl:grid-cols-4',
-      showResultInput: true,
+      gridCols: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4',
+      showResultInput: false,
     },
     Cuartos: {
       title: "CUARTOS DE FINAL",
       color: 'blue',
       waitingText: 'Esperando resultados...',
-      gridCols: 'grid-cols-1 md:grid-cols-2 xl:grid-cols-4',
-      showResultInput: true,
+      gridCols: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4',
+      showResultInput: false,
     },
     Semis: {
       title: "SEMIFINALES",
@@ -94,6 +96,13 @@ const Admin = () => {
       gridCols: '',
       showResultInput: true,
     },
+    TercerLugar: {
+      title: "TERCER LUGAR",
+      color: 'orange',
+      waitingText: 'Esperando perdedores de semifinales...',
+      gridCols: '',
+      showResultInput: true,
+    },
   };
 
   const colorClasses: Record<string, { border: string; text: string; winner: string; badge: string }> = {
@@ -105,6 +114,9 @@ const Admin = () => {
     amber: { border: 'border-amber-200 dark:border-amber-500/20', text: 'text-amber-600 dark:text-amber-400', winner: 'bg-amber-50 dark:bg-amber-950 border-amber-300 dark:border-amber-500 text-amber-800 dark:text-amber-300', badge: 'bg-amber-500 text-white' },
   };
 
+  // ============================================================
+  // RENDER: Tarjeta para fase de grupos (con inputs de goles)
+  // ============================================================
   const renderMatchCard = (m: Match, stageConfig: StageConfig) => {
     const cc = colorClasses[stageConfig.color];
     const hasResult = m.scoreA !== null && m.scoreB !== null;
@@ -190,7 +202,163 @@ const Admin = () => {
     );
   };
 
-  const renderStageSection = (stageName: string, matchesForStage: Match[]) => {
+  // ============================================================
+  // RENDER: Tarjeta para eliminatorias (click para seleccionar ganador)
+  // ============================================================
+  const renderKnockoutCard = (m: Match, stageConfig: StageConfig) => {
+    const cc = colorClasses[stageConfig.color];
+    const hasResult = m.winnerId !== null;
+    const teamA = getTeam(m.teamAId);
+    const teamB = getTeam(m.teamBId);
+    const bothTeamsReady = m.teamAId && m.teamBId;
+
+    // Estado local de scores opcionales para este partido
+    const ks = knockoutScores[m.id] || { a: '', b: '' };
+    const showScoreInputs = bothTeamsReady && !hasResult;
+
+    const handleWinnerClick = (winnerId: string) => {
+      if (hasResult) return; // Ya tiene resultado
+      const a = ks.a === '' ? undefined : Number(ks.a);
+      const b = ks.b === '' ? undefined : Number(ks.b);
+      setKnockoutWinner(m.id, winnerId, a, b);
+      // Limpiar scores temporales
+      setKnockoutScores(prev => {
+        const copy = { ...prev };
+        delete copy[m.id];
+        return copy;
+      });
+    };
+
+    const handleKnockoutScore = (side: 'a' | 'b', value: string) => {
+      const num = value === '' ? '' : parseInt(value, 10);
+      if (value !== '' && (isNaN(num as number) || (num as number) < 0)) return;
+      setKnockoutScores(prev => ({
+        ...prev,
+        [m.id]: { ...prev[m.id], [side]: num },
+      }));
+    };
+
+    return (
+      <div
+        key={m.id}
+        className={`bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden transition-all ${
+          hasResult ? 'border-l-4 border-l-green-500' : ''
+        } ${!bothTeamsReady ? 'opacity-40' : ''}`}
+      >
+        {/* Header */}
+        <div className="flex justify-between items-center px-4 pt-3 pb-1 text-[10px] text-gray-500 dark:text-gray-400 font-bold">
+          <span className="flex items-center gap-1">
+            <ChevronRight className="w-3 h-3" />
+            Partido #{m.id}
+          </span>
+          {m.date && <span>{m.date}</span>}
+        </div>
+
+        {!bothTeamsReady ? (
+          <p className="text-xs text-gray-400 dark:text-gray-500 italic text-center py-6 px-4">
+            {stageConfig.waitingText}
+          </p>
+        ) : (
+          <div className="p-3 space-y-2">
+            {/* Team A — clickeable */}
+            <button
+              onClick={() => handleWinnerClick(m.teamAId!)}
+              disabled={hasResult}
+              className={`w-full p-3 rounded-lg border text-xs font-semibold flex items-center justify-between transition-all ${
+                hasResult
+                  ? m.winnerId === m.teamAId
+                    ? `${cc.winner} ring-2 ring-offset-1 ring-green-400 dark:ring-green-600`
+                    : 'bg-gray-100 dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-gray-400 dark:text-gray-500 line-through'
+                  : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-950/30 cursor-pointer'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <img src={teamA?.flagUrl} alt="" className="w-6 h-4 object-cover rounded" loading="lazy" />
+                <span>{teamA?.name}</span>
+                {hasResult && m.winnerId === m.teamAId && <Crown className="w-3.5 h-3.5 text-yellow-500" />}
+              </span>
+              {hasResult && m.scoreA !== null && (
+                <span className={`font-extrabold text-sm ${m.winnerId === m.teamAId ? 'text-green-700 dark:text-green-400' : ''}`}>{m.scoreA}</span>
+              )}
+              {!hasResult && (
+                <span className="text-[9px] text-gray-400 font-normal italic">Click para ganador →</span>
+              )}
+            </button>
+
+            {/* VS divider */}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+              <span className="text-[10px] font-bold text-gray-400 uppercase">vs</span>
+              <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+            </div>
+
+            {/* Team B — clickeable */}
+            <button
+              onClick={() => handleWinnerClick(m.teamBId!)}
+              disabled={hasResult}
+              className={`w-full p-3 rounded-lg border text-xs font-semibold flex items-center justify-between transition-all ${
+                hasResult
+                  ? m.winnerId === m.teamBId
+                    ? `${cc.winner} ring-2 ring-offset-1 ring-green-400 dark:ring-green-600`
+                    : 'bg-gray-100 dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-gray-400 dark:text-gray-500 line-through'
+                  : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-950/30 cursor-pointer'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <img src={teamB?.flagUrl} alt="" className="w-6 h-4 object-cover rounded" loading="lazy" />
+                <span>{teamB?.name}</span>
+                {hasResult && m.winnerId === m.teamBId && <Crown className="w-3.5 h-3.5 text-yellow-500" />}
+              </span>
+              {hasResult && m.scoreB !== null && (
+                <span className={`font-extrabold text-sm ${m.winnerId === m.teamBId ? 'text-green-700 dark:text-green-400' : ''}`}>{m.scoreB}</span>
+              )}
+              {!hasResult && (
+                <span className="text-[9px] text-gray-400 font-normal italic">Click para ganador →</span>
+              )}
+            </button>
+
+            {/* Scores opcionales (solo si no hay resultado) */}
+            {showScoreInputs && (
+              <div className="flex items-center gap-1.5 pt-1 border-t border-gray-100 dark:border-gray-800">
+                <span className="text-[9px] text-gray-400 whitespace-nowrap">Goles (opc):</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="20"
+                  value={ks.a}
+                  onChange={e => handleKnockoutScore('a', e.target.value)}
+                  placeholder="-"
+                  className="w-10 text-center text-[11px] font-bold bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded py-0.5 text-gray-700 dark:text-gray-200 focus:border-green-400 focus:outline-none"
+                />
+                <span className="text-[9px] text-gray-400">-</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="20"
+                  value={ks.b}
+                  onChange={e => handleKnockoutScore('b', e.target.value)}
+                  placeholder="-"
+                  className="w-10 text-center text-[11px] font-bold bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded py-0.5 text-gray-700 dark:text-gray-200 focus:border-green-400 focus:outline-none"
+                />
+              </div>
+            )}
+
+            {/* Badge de ganador registrado */}
+            {hasResult && m.winnerId && (
+              <div className="flex justify-center pt-1">
+                <span className={`text-[9px] uppercase px-2 py-0.5 rounded-full ${cc.badge} font-extrabold shadow-sm flex items-center gap-1`}>
+                  <Crown className="w-2.5 h-2.5" />
+                  {getTeam(m.winnerId)?.name} AVANZA
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderStageSection = (stageName: string, matchesForStage: Match[], isKnockout: boolean = false) => {
     const stageConfig = stageConfigs[stageName];
     if (!stageConfig) return null;
     const cc = colorClasses[stageConfig.color] || colorClasses.gray;
@@ -201,7 +369,7 @@ const Admin = () => {
           {stageConfig.title}
         </span>
         <div className={`grid gap-4 ${stageConfig.gridCols}`}>
-          {matchesForStage.map(m => renderMatchCard(m, stageConfig))}
+          {matchesForStage.map(m => isKnockout ? renderKnockoutCard(m, stageConfig) : renderMatchCard(m, stageConfig))}
         </div>
       </div>
     );
@@ -418,13 +586,14 @@ const Admin = () => {
             <Trophy className="text-amber-500 dark:text-amber-400" /> Registrar Resultados
           </h3>
           {renderStageSection('Grupos', matches.filter(m => m.stage === 'Grupos'))}
-          {renderStageSection('Dieciseisavos', matches.filter(m => m.stage === 'Dieciseisavos'))}
-          {renderStageSection('Octavos', matches.filter(m => m.stage === 'Octavos'))}
-          {renderStageSection('Cuartos', matches.filter(m => m.stage === 'Cuartos'))}
+          {renderStageSection('Dieciseisavos', matches.filter(m => m.stage === 'Dieciseisavos'), true)}
+          {renderStageSection('Octavos', matches.filter(m => m.stage === 'Octavos'), true)}
+          {renderStageSection('Cuartos', matches.filter(m => m.stage === 'Cuartos'), true)}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4">
-            {renderStageSection('Semis', matches.filter(m => m.stage === 'Semis'))}
-            {renderStageSection('Final', matches.filter(m => m.stage === 'Final'))}
+            {renderStageSection('Semis', matches.filter(m => m.stage === 'Semis'), true)}
+            {renderStageSection('Final', matches.filter(m => m.stage === 'Final'), true)}
           </div>
+          {renderStageSection('TercerLugar', matches.filter(m => m.stage === 'TercerLugar'), true)}
         </div>
       </div>
 
