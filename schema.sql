@@ -37,9 +37,24 @@ CREATE TABLE participants (
   team_id TEXT REFERENCES teams(id),          -- Mantenido por compatibilidad (primer equipo)
   photo_type TEXT NOT NULL DEFAULT 'avatar',
   photo TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'activo',      -- 'activo' | 'eliminado'
+  draw_count INTEGER NOT NULL DEFAULT 1,
+  ordenes_sorteo INTEGER[] DEFAULT '{}',
+  orden_pronostico INTEGER,
   registered_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- 4. Create table for match results (persist winners/scores)
+CREATE TABLE match_results (
+  match_id INTEGER PRIMARY KEY REFERENCES matches(id),
+  team_a_score INTEGER,
+  team_b_score INTEGER,
+  winner_id TEXT REFERENCES teams(id),
+  updated_by TEXT NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_match_results_match_id ON match_results(match_id);
 
 
 -- ----------------------------
