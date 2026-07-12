@@ -42,7 +42,7 @@ const ADMIN_EMAILS = [
 
 // ─── Componente ───────────────────────────────────────────
 const BracketView = () => {
-  const { matches, teams, setKnockoutWinner, myRegistration } = useQuinielaStore();
+  const { matches, teams, setKnockoutWinner, myRegistration, participants } = useQuinielaStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const [connectors, setConnectors] = useState<ConnectorData[]>([]);
   const [saving, setSaving] = useState<number | null>(null);
@@ -214,7 +214,7 @@ const BracketView = () => {
       ? "border-green-400 dark:border-green-600"
       : `border-${color}-300 dark:border-${color}-700`;
 
-    const renderTeam = (team: Team | undefined, side: "A" | "B") => {
+        const renderTeam = (team: Team | undefined, side: "A" | "B") => {
       const isWinner = hasWinner && m.winnerId === m[`team${side}Id` as "teamAId" | "teamBId"];
       const score = m[`score${side}` as "scoreA" | "scoreB"];
 
@@ -226,9 +226,11 @@ const BracketView = () => {
         );
       }
 
+      const representative = participants.find(p => p.teamIds.includes(team.id));
+
       const content = (
         <div
-          className={`flex items-center gap-2 px-2 py-1.5 rounded transition-all ${
+          className={`flex items-center gap-2 px-2 py-1.5 rounded transition-all group ${
             hasWinner
               ? isWinner
                 ? "bg-green-100 dark:bg-green-950/40 font-bold text-green-800 dark:text-green-300"
@@ -243,7 +245,12 @@ const BracketView = () => {
           title={!hasWinner && isAdmin ? `Click para seleccionar a ${team.name} como ganador` : undefined}
         >
           <img src={team.flagUrl} alt="" className="w-5 h-3.5 object-cover rounded flex-shrink-0" loading="lazy" />
-          <span className="text-[11px] font-semibold truncate flex-1">{team.name}</span>
+          <div className="flex-1 truncate">
+            <span className="text-[11px] font-semibold truncate block">{team.name}</span>
+            {representative && (
+              <span className="text-[9px] text-gray-500 dark:text-gray-400 truncate block">{representative.name}</span>
+            )}
+          </div>
           {isWinner && <Crown className="w-3 h-3 text-yellow-500 flex-shrink-0" />}
           {hasWinner && score !== null && (
             <span className={`text-xs font-extrabold flex-shrink-0 ${isWinner ? "text-green-700 dark:text-green-400" : ""}`}>
